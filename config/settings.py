@@ -9,13 +9,13 @@ else:
     APP_DIR = Path.home() / ".zettelkasten"
 DB_PATH              = APP_DIR / "notes.db"
 PDF_DIR              = APP_DIR / "pdfs"
-THEME                = "dark"        # "dark" | "light"
+THEME                = "light"        # "dark" | "light"
 FONT_SIZE            = 14            # pt
 QUICK_CAPTURE_HOTKEY = "ctrl+shift+n"
 CLUSTER_MIN_NOTES    = 50
 
 
-SYNC_SERVER_URL  = os.environ.get("ZK_SYNC_SERVER_URL", "http://<서버IP>:8000")
+SYNC_SERVER_URL  = os.environ.get("ZK_SYNC_SERVER_URL", "http://132.226.71.123:8000")
 DEVICE_ID        = os.environ.get("ZK_DEVICE_ID", "main-pc")  # 기기별 고유 값
 SYNC_TOKEN       = os.environ.get("ZK_SYNC_TOKEN", "")        # 최초 인증 후 저장
 SYNC_INTERVAL    = int(os.environ.get("ZK_SYNC_INTERVAL", "30"))  # 초
