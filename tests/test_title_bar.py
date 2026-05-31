@@ -19,6 +19,18 @@ def test_title_bar_has_window_buttons(qtbot):
     assert bar._title_label.text() == "새 제목"
 
 
+def test_title_bar_dots_use_specified_colors(qtbot):
+    window = QMainWindow()
+    qtbot.addWidget(window)
+    bar = CustomTitleBar(window)
+    # 빨강=종료, 주황=최소화, 초록=최대화.
+    assert CustomTitleBar.DOT_CLOSE in bar._btn_close.styleSheet()
+    assert CustomTitleBar.DOT_MINIMIZE in bar._btn_min.styleSheet()
+    assert CustomTitleBar.DOT_MAXIMIZE in bar._btn_max.styleSheet()
+    # 도트는 작은 원형 버튼이다.
+    assert bar._btn_close.width() == bar._btn_close.height()
+
+
 def test_title_bar_double_click_toggles_without_error(qtbot):
     window = QMainWindow()
     qtbot.addWidget(window)

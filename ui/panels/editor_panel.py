@@ -16,6 +16,7 @@ from db.repositories.tag_repo import TagRepository
 from services.attachment_service import AttachmentService
 from services.classifier import NoteClassifier
 from services.css_snippet_service import get_css_snippet_service
+from services.font_service import get_font_service
 from services.markdown_service import render_document
 from services.markdown_style_service import get_markdown_style_service
 from ui.widgets.tag_chip import TagChip
@@ -59,6 +60,7 @@ class EditorPanel(QWidget):
         self._attachments = AttachmentService()
         self._md_style = get_markdown_style_service()
         self._css_snippets = get_css_snippet_service()
+        self._fonts = get_font_service()
         self._current_id: str | None = None
         self._suggested_type: str | None = None
         self._workers: list[_ThumbnailWorker] = []
@@ -110,6 +112,7 @@ class EditorPanel(QWidget):
         # Phase 4/5 서식·스니펫이 바뀌면 미리보기가 켜져 있을 때 즉시 갱신.
         self._md_style.style_changed.connect(self._refresh_preview)
         self._css_snippets.snippets_changed.connect(self._refresh_preview)
+        self._fonts.fonts_changed.connect(self._refresh_preview)
 
         # PDF 등 첨부 카드 영역.
         self._attach_container = QWidget(self)
@@ -260,8 +263,10 @@ class EditorPanel(QWidget):
 
     # ----- 마크다운 보기 -------------------------------------------------
     def _markdown_css(self) -> str:
-        """Phase 4 서식 CSS 와 Phase 5 활성 스니펫 CSS 를 합친다."""
-        return f"{self._md_style.build_css()}\n{self._css_snippets.build_css()}"
+        """Phase 4 서식 CSS, Phase 5 활성 스니펫 CSS, 사용자 폰트 CSS 를 합친다."""
+        return (f"{self._md_style.build_css()}\n"
+                f"{self._css_snippets.build_css()}\n"
+                f"{self._fonts.build_css()}")
 
     def _render_preview(self) -> None:
         self._preview.setHtml(

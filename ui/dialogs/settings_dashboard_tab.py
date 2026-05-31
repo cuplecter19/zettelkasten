@@ -15,15 +15,24 @@ from PySide6.QtWidgets import (QFrame, QGridLayout, QGroupBox, QHBoxLayout,
                                QLabel, QPushButton, QVBoxLayout, QWidget)
 
 from services.dashboard_service import NOTE_TYPE_LABELS, DashboardService
+from services.panel_service import PanelService, get_panel_service
 
 
 class SettingsDashboardTab(QWidget):
-    """대시보드 탭: 지식 베이스 통계를 요약해 보여준다."""
+    """대시보드 탭: 지식 베이스 통계를 요약해 보여준다.
 
-    def __init__(self, dashboard: DashboardService, parent=None) -> None:
+    표시되는 패널은 :class:`~services.panel_service.PanelService`(패널 모드)에
+    따라 모듈 단위로 켜고 끌 수 있다.
+    """
+
+    def __init__(self, dashboard: DashboardService, parent=None,
+                 panels: PanelService | None = None) -> None:
         super().__init__(parent)
         self._dashboard = dashboard
+        self._panels = panels or get_panel_service()
         self._values: dict[str, QLabel] = {}
+        # 패널 키 → 패널 위젯(패널 모드 표시/숨김 대상).
+        self._panel_widgets: dict[str, QWidget] = {}
 
         root = QVBoxLayout(self)
 
@@ -40,6 +49,7 @@ class SettingsDashboardTab(QWidget):
         self._add_metric(summary_grid, 5, "total_attachments", "첨부")
         self._add_metric(summary_grid, 6, "total_pdf_assets", "PDF 자산")
         root.addWidget(summary)
+        self._panel_widgets["summary"] = summary
 
         # 중단: 유형별 노트 분포.
         by_type = QGroupBox("유형별 노트", self)
@@ -49,6 +59,7 @@ class SettingsDashboardTab(QWidget):
         for row, (note_type, label) in enumerate(NOTE_TYPE_LABELS.items()):
             self._add_metric(type_grid, row, f"type:{note_type}", label)
         root.addWidget(by_type)
+        self._panel_widgets["by_type"] = by_type
 
         # 하단: 새로고침 버튼.
         buttons = QHBoxLayout()
@@ -59,6 +70,9 @@ class SettingsDashboardTab(QWidget):
         root.addLayout(buttons)
         root.addStretch(1)
 
+        # 패널 모드 변경 시 표시/숨김을 갱신.
+        self._panels.panels_changed.connect(self._apply_panel_visibility)
+        self._apply_panel_visibility()
         self.refresh()
 
     def _add_metric(self, grid: QGridLayout, row: int, key: str,
@@ -72,6 +86,11 @@ class SettingsDashboardTab(QWidget):
         grid.addWidget(name, row, 0)
         grid.addWidget(value, row, 1)
         self._values[key] = value
+
+    def _apply_panel_visibility(self) -> None:
+        """패널 모드 설정에 따라 각 패널의 표시/숨김을 적용한다."""
+        for panel, widget in self._panel_widgets.items():
+            widget.setVisible(self._panels.is_enabled(panel))
 
     def refresh(self) -> None:
         """서비스에서 통계를 다시 읽어 화면을 갱신한다."""

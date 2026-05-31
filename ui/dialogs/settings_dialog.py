@@ -18,16 +18,20 @@ from services.css_snippet_service import (CssSnippetService,
                                           get_css_snippet_service)
 from services.dashboard_service import (DashboardService,
                                         get_dashboard_service)
+from services.font_service import FontService, get_font_service
 from services.markdown_style_service import (MarkdownStyleService,
                                              get_markdown_style_service)
+from services.panel_service import PanelService, get_panel_service
 from services.theme_service import ThemeService, get_theme_service
 from ui.dialogs.settings_css_tab import SettingsCssTab
 from ui.dialogs.settings_dashboard_tab import SettingsDashboardTab
 from ui.dialogs.settings_design_tab import SettingsDesignTab
+from ui.dialogs.settings_font_tab import SettingsFontTab
 from ui.dialogs.settings_markdown_tab import SettingsMarkdownTab
+from ui.dialogs.settings_panel_tab import SettingsPanelTab
 
 # 카테고리 순서(목록과 스택 인덱스가 일치한다).
-CATEGORIES = ["디자인", "마크다운", "CSS 스니펫", "대시보드"]
+CATEGORIES = ["디자인", "마크다운", "CSS 스니펫", "대시보드", "폰트", "패널 모드"]
 
 
 def _placeholder(text: str) -> QWidget:
@@ -47,12 +51,16 @@ class SettingsDialog(QDialog):
     def __init__(self, parent=None, theme: ThemeService | None = None,
                  markdown_style: MarkdownStyleService | None = None,
                  css_snippets: CssSnippetService | None = None,
-                 dashboard: DashboardService | None = None) -> None:
+                 dashboard: DashboardService | None = None,
+                 fonts: FontService | None = None,
+                 panels: PanelService | None = None) -> None:
         super().__init__(parent)
         self._theme = theme or get_theme_service()
         self._markdown_style = markdown_style or get_markdown_style_service()
         self._css_snippets = css_snippets or get_css_snippet_service()
         self._dashboard = dashboard or get_dashboard_service()
+        self._fonts = fonts or get_font_service()
+        self._panels = panels or get_panel_service()
         self.setWindowTitle("설정")
         self.resize(720, 520)
 
@@ -81,12 +89,17 @@ class SettingsDialog(QDialog):
         self._design_tab = SettingsDesignTab(self._theme, self)
         self._markdown_tab = SettingsMarkdownTab(self._markdown_style, self)
         self._css_tab = SettingsCssTab(self._css_snippets, self)
-        self._dashboard_tab = SettingsDashboardTab(self._dashboard, self)
+        self._dashboard_tab = SettingsDashboardTab(
+            self._dashboard, self, panels=self._panels)
+        self._font_tab = SettingsFontTab(self._fonts, self)
+        self._panel_tab = SettingsPanelTab(self._panels, self)
         return [
             self._design_tab,              # 디자인 (Phase 1-3)
             self._markdown_tab,            # 마크다운 (Phase 4)
             self._css_tab,                 # CSS 스니펫 (Phase 5)
             self._dashboard_tab,           # 대시보드 (Phase 6)
+            self._font_tab,                # 폰트 (사용자 폰트 업로드/지정)
+            self._panel_tab,               # 패널 모드 (모듈형 대시보드 패널)
         ]
 
     def _on_category_changed(self, row: int) -> None:
