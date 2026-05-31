@@ -28,6 +28,9 @@ class PdfAsset(Base):
         String, ForeignKey("notes.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime, nullable=False, server_default=func.current_timestamp())
+    # 동기화 메타데이터.
+    last_synced_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<PdfAsset id={self.id!r} title={self.title!r}>"

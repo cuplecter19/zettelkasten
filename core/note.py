@@ -28,6 +28,9 @@ class Note(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     color_hint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 동기화 메타데이터.
+    last_synced_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     def __repr__(self) -> str:  # pragma: no cover - debug helper
         return f"<Note id={self.id!r} type={self.note_type!r} title={self.title!r}>"

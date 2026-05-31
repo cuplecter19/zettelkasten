@@ -72,11 +72,16 @@ class NoteRepository:
             session.refresh(note)
             return note
 
-    def delete(self, note_id: str) -> None:
+    def delete(self, note_id: str, device_id: str | None = None) -> None:
+        """소프트 삭제: 실제 행을 지우지 않고 ``deleted_at`` 에 시각을 기록한다."""
         with get_session() as session:
             note = session.get(Note, note_id)
             if note is not None:
-                session.delete(note)
+                now = datetime.now()
+                note.deleted_at = now
+                note.updated_at = now
+                if device_id is not None:
+                    note.last_synced_by = device_id
 
     def list_all(self, order_by: str = "updated_at",
                  pinned_first: bool = True) -> list[Note]:
@@ -88,7 +93,7 @@ class NoteRepository:
         }.get(order_by, Note.updated_at)
 
         with get_session() as session:
-            stmt = select(Note)
+            stmt = select(Note).where(Note.deleted_at.is_(None))
             order_cols = []
             if pinned_first:
                 order_cols.append(Note.is_pinned.desc())
@@ -104,7 +109,8 @@ class NoteRepository:
             sql = text(
                 "SELECT n.id FROM notes_fts f "
                 "JOIN notes n ON n.rowid = f.rowid "
-                "WHERE notes_fts MATCH :q ORDER BY rank"
+                "WHERE notes_fts MATCH :q AND n.deleted_at IS NULL "
+                "ORDER BY rank"
             )
             ids = [row[0] for row in session.execute(sql, {"q": match_expr})]
             if not ids:
@@ -116,6 +122,42 @@ class NoteRepository:
     def get_by_type(self, note_type: str) -> list[Note]:
         with get_session() as session:
             stmt = (select(Note)
-                    .where(Note.note_type == note_type)
+                    .where(Note.note_type == note_type,
+                           Note.deleted_at.is_(None))
                     .order_by(Note.is_pinned.desc(), Note.updated_at.desc()))
             return list(session.scalars(stmt).all())
+
+    # ----- 동기화 지원 -----------------------------------------------------
+    def list_changed_since(self, since: datetime | None) -> list[Note]:
+        """``since`` 이후 변경된(삭제 포함) 노트를 반환한다.
+
+        ``since`` 가 ``None`` 이면 전체를 반환한다. 동기화 push 수집에 사용한다.
+        """
+        with get_session() as session:
+            stmt = select(Note)
+            if since is not None:
+                stmt = stmt.where(Note.updated_at > since)
+            return list(session.scalars(stmt).all())
+
+    def upsert_remote(self, record: dict) -> None:
+        """원격(서버) 노트 레코드를 로컬에 그대로 반영한다(LWW 적용 후 호출).
+
+        ``record`` 는 id/title/body/note_type/updated_at/created_at/is_pinned/
+        color_hint/deleted_at 키를 가질 수 있다.
+        """
+        with get_session() as session:
+            note = session.get(Note, record["id"])
+            if note is None:
+                note = Note(id=record["id"])
+                session.add(note)
+            note.title = record.get("title", note.title or "제목 없음")
+            note.body = record.get("body", note.body or "")
+            note.note_type = record.get("note_type", note.note_type or "IDEA")
+            note.is_pinned = bool(record.get("is_pinned", note.is_pinned))
+            note.color_hint = record.get("color_hint", note.color_hint)
+            note.updated_at = record.get("updated_at", note.updated_at)
+            if record.get("created_at") is not None:
+                note.created_at = record["created_at"]
+            note.deleted_at = record.get("deleted_at")
+            note.last_synced_by = record.get("last_synced_by",
+                                             note.last_synced_by)

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from datetime import datetime
 
 from sqlalchemy import select
 
@@ -38,14 +39,19 @@ class PdfRepository:
 
     def list_all(self) -> list[PdfAsset]:
         with get_session() as session:
-            stmt = select(PdfAsset).order_by(PdfAsset.created_at.desc())
+            stmt = (select(PdfAsset)
+                    .where(PdfAsset.deleted_at.is_(None))
+                    .order_by(PdfAsset.created_at.desc()))
             return list(session.scalars(stmt).all())
 
-    def delete(self, asset_id: str) -> None:
+    def delete(self, asset_id: str, device_id: str | None = None) -> None:
+        """소프트 삭제: ``deleted_at`` 에 시각을 기록한다."""
         with get_session() as session:
             asset = session.get(PdfAsset, asset_id)
             if asset is not None:
-                session.delete(asset)
+                asset.deleted_at = datetime.now()
+                if device_id is not None:
+                    asset.last_synced_by = device_id
 
     def link_to_note(self, asset_id: str, note_id: str | None) -> PdfAsset:
         with get_session() as session:
