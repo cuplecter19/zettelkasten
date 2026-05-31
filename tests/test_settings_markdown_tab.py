@@ -25,6 +25,13 @@ def test_spinbox_change_updates_service(qtbot, tmp_path):
     assert style.get_style("h1")["font_size"] == 40
 
 
+def test_tab_exposes_list_and_table_rows(qtbot, tmp_path):
+    tab = SettingsMarkdownTab(_style(tmp_path))
+    qtbot.addWidget(tab)
+    for element in ("ul", "table", "th", "td"):
+        assert element in tab._rows
+
+
 def test_checkbox_change_updates_service(qtbot, tmp_path):
     style = _style(tmp_path)
     tab = SettingsMarkdownTab(style)

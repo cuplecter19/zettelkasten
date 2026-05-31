@@ -69,3 +69,11 @@ def test_build_stylesheet_paints_settings_background():
     assert "QWidget#SettingsPage" in qss
     assert "QListWidget#SettingsCategoryList" in qss
     assert "QStackedWidget#SettingsStack" in qss
+
+
+def test_build_stylesheet_paints_docked_panels_and_message_boxes():
+    qss = build_stylesheet({"background": "#010203", "editor": "#111213"})
+    assert "QDockWidget" in qss
+    assert "QDockWidget::title" in qss
+    assert "QMessageBox" in qss
+    assert "QGraphicsView" in qss

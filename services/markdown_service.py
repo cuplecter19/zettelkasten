@@ -18,7 +18,8 @@ logger = logging.getLogger(__name__)
 _CLASSED_TAGS = (
     "h1", "h2", "h3", "h4", "h5", "h6",
     "p", "blockquote", "pre", "code",
-    "ul", "ol", "li", "table", "a", "img",
+    "ul", "ol", "li", "table", "thead", "tbody", "tr", "th", "td",
+    "a", "img",
 )
 
 # 여는 태그(예: ``<h1>`` 또는 ``<a href="...">``)를 찾는 패턴.
