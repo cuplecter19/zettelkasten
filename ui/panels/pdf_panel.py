@@ -120,3 +120,13 @@ class PDFPanel(QWidget):
         except Exception:
             logger.exception("Delete PDF failed")
             QMessageBox.warning(self, "오류", "삭제에 실패했습니다.")
+
+
+if __name__ == "__main__":
+    from PySide6.QtWidgets import QApplication
+    import sys
+    app = QApplication(sys.argv)
+    widget = PDFPanel()
+    widget.resize(800, 600)
+    widget.show()
+    sys.exit(app.exec())

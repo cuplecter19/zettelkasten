@@ -113,3 +113,12 @@ class HotkeyManager(QObject):
         except Exception:
             logger.debug("Failed to remove hotkey", exc_info=True)
         self._registered = False
+
+
+if __name__ == "__main__":
+    from PySide6.QtWidgets import QApplication
+    import sys
+    app = QApplication(sys.argv)
+    dialog = QuickCaptureDialog()
+    dialog.show()
+    sys.exit(app.exec())
