@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt
+from PySide6.QtCore import QAbstractAnimation, QEasingCurve, QPropertyAnimation, Qt
 from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QGraphicsOpacityEffect, QLabel, QVBoxLayout,
                                QWidget)
@@ -77,7 +77,7 @@ class StartupDashboardOverlay(QWidget):
 
     def fade_out(self) -> None:
         """오버레이를 페이드아웃한다."""
-        if self._animation.state() == QPropertyAnimation.Running:
+        if self._animation.state() == QAbstractAnimation.Running:
             return
         self._animation.start()
 

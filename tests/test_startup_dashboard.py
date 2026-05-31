@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import QAbstractAnimation, Qt
 
 from ui.widgets.startup_dashboard import StartupDashboardOverlay
 
@@ -22,4 +22,4 @@ def test_startup_dashboard_fades_out_on_click(qtbot):
 
     qtbot.mouseClick(overlay, Qt.LeftButton)
 
-    assert overlay._animation.state() == overlay._animation.Running
+    assert overlay._animation.state() == QAbstractAnimation.Running
