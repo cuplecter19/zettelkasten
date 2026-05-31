@@ -22,10 +22,10 @@ logger = logging.getLogger(__name__)
 THEME_PATH = APP_DIR / "theme.json"
 
 # 커스터마이징 가능한 UI 요소의 기본 색상(라이트 테마).
-# 첨부된 기본 UI 시안과 동일한 밝은 블루-그레이 팔레트를 사용한다. 사용자가
-# 설정의 디자인 탭에서 색상을 지정하면 그 값이 이 기본값보다 우선한다.
+# 기본 배경은 흰색이며, 사용자가 설정의 디자인 탭에서 색상을 지정하면 그 값이
+# 이 기본값보다 우선한다.
 DEFAULT_THEME: dict[str, str] = {
-    "background":   "#eef1f7",
+    "background":   "#ffffff",
     "sidebar":      "#e2e6ef",
     "editor":       "#d9dde6",
     "text":         "#3a3f47",
@@ -66,6 +66,12 @@ def build_stylesheet(colors: dict[str, str]) -> str:
     # 외곽선을 없애고 둥근 모서리 위주의 파스텔 UI 를 구성한다.
     return f"""
 QMainWindow, QDialog {{ background-color: {bg}; color: {text}; }}
+QMainWindow > QWidget, QDialog > QWidget, QDialog#SettingsDialog,
+QDialog#SettingsDialog QWidget#SettingsPage,
+QDialog#SettingsDialog QListWidget#SettingsCategoryList,
+QDialog#SettingsDialog QStackedWidget#SettingsStack {{
+    background-color: {bg}; color: {text};
+}}
 QWidget {{ background-color: transparent; color: {text}; }}
 QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget {{
     background-color: {editor}; color: {text}; border: none;

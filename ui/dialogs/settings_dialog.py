@@ -37,6 +37,7 @@ CATEGORIES = ["디자인", "마크다운", "CSS 스니펫", "대시보드", "폰
 def _placeholder(text: str) -> QWidget:
     """후속 Phase 에서 채울 빈 탭 플레이스홀더."""
     page = QWidget()
+    page.setObjectName("SettingsPage")
     layout = QVBoxLayout(page)
     label = QLabel(f"{text} 설정은 곧 제공됩니다.")
     label.setEnabled(False)
@@ -62,17 +63,20 @@ class SettingsDialog(QDialog):
         self._fonts = fonts or get_font_service()
         self._panels = panels or get_panel_service()
         self.setWindowTitle("설정")
+        self.setObjectName("SettingsDialog")
         self.resize(720, 520)
 
         layout = QHBoxLayout(self)
 
         self._list = QListWidget(self)
+        self._list.setObjectName("SettingsCategoryList")
         self._list.setFixedWidth(160)
         self._list.addItems(CATEGORIES)
         self._list.currentRowChanged.connect(self._on_category_changed)
         layout.addWidget(self._list)
 
         self._stack = QStackedWidget(self)
+        self._stack.setObjectName("SettingsStack")
         layout.addWidget(self._stack, 1)
 
         for page in self._build_pages():
@@ -87,12 +91,18 @@ class SettingsDialog(QDialog):
         플레이스홀더로 채운다.
         """
         self._design_tab = SettingsDesignTab(self._theme, self)
+        self._design_tab.setObjectName("SettingsPage")
         self._markdown_tab = SettingsMarkdownTab(self._markdown_style, self)
+        self._markdown_tab.setObjectName("SettingsPage")
         self._css_tab = SettingsCssTab(self._css_snippets, self)
+        self._css_tab.setObjectName("SettingsPage")
         self._dashboard_tab = SettingsDashboardTab(
             self._dashboard, self, panels=self._panels)
+        self._dashboard_tab.setObjectName("SettingsPage")
         self._font_tab = SettingsFontTab(self._fonts, self)
+        self._font_tab.setObjectName("SettingsPage")
         self._panel_tab = SettingsPanelTab(self._panels, self)
+        self._panel_tab.setObjectName("SettingsPage")
         return [
             self._design_tab,              # 디자인 (Phase 1-3)
             self._markdown_tab,            # 마크다운 (Phase 4)
