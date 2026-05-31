@@ -38,3 +38,15 @@ def test_panel_mode_hides_disabled_panel(qtbot, db, tmp_path):
     assert tab._panel_widgets["by_type"].isVisibleTo(tab) is True
     panels.set_enabled("by_type", False)
     assert tab._panel_widgets["by_type"].isVisibleTo(tab) is False
+
+
+def test_welcome_controls_follow_dashboard_settings(qtbot, db, tmp_path):
+    service = DashboardService(tmp_path / "dashboard.json")
+    tab = SettingsDashboardTab(service)
+    qtbot.addWidget(tab)
+
+    service.set_welcome_color("#123456")
+    service.set_welcome_image_path("/tmp/cover.png")
+
+    assert tab._welcome_color_btn.text() == "색상: #123456"
+    assert "cover.png" in tab._welcome_image_label.text()

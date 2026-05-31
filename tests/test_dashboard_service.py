@@ -56,3 +56,21 @@ def test_tag_and_untagged_counts(db):
 def test_collect_stats_without_db_is_safe():
     # init_db() 를 호출하지 않은 상태에서도 빈 통계를 반환해야 한다.
     assert DashboardService().collect_stats() == _empty_stats()
+
+
+def test_dashboard_settings_are_persisted(tmp_path):
+    path = tmp_path / "dashboard.json"
+    service = DashboardService(path)
+    service.set_welcome_color("#abcdef")
+    service.set_welcome_image_path("/tmp/background.png")
+
+    reloaded = DashboardService(path)
+    assert reloaded.welcome_color() == "#abcdef"
+    assert reloaded.welcome_image_path() == "/tmp/background.png"
+
+
+def test_dashboard_rejects_invalid_color(tmp_path):
+    service = DashboardService(tmp_path / "dashboard.json")
+    original = service.welcome_color()
+    service.set_welcome_color("not-a-color")
+    assert service.welcome_color() == original

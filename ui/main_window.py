@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 
-from PySide6.QtCore import Qt
+from PySide6.QtCore import Qt, QTimer
 from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QDockWidget, QFileDialog, QLabel, QLineEdit,
                                QListWidget, QListWidgetItem, QMainWindow,
@@ -16,16 +16,20 @@ from PySide6.QtWidgets import (QDockWidget, QFileDialog, QLabel, QLineEdit,
 from db.repositories.note_repo import NoteRepository
 from config import settings
 from services.export_service import ExportService
+from services.dashboard_service import get_dashboard_service
 from services.linker import LinkerService
 from services.layout_service import LayoutService
+from services.orphan_service import get_orphan_collector_service
 from services.sync_service import SyncService
 from services.theme_service import get_theme_service
+from ui.dialogs.orphan_notes_dialog import OrphanNotesDialog
 from ui.dialogs.settings_dialog import SettingsDialog
 from ui.panels.editor_panel import EditorPanel
 from ui.panels.explorer_panel import ExplorerPanel
 from ui.panels.graph_panel import GraphPanel
 from ui.panels.pdf_panel import PDFPanel
 from ui.widgets.quick_capture import HotkeyManager, QuickCaptureDialog
+from ui.widgets.startup_dashboard import StartupDashboardOverlay
 from ui.widgets.title_bar import CustomTitleBar, FramelessResizer
 
 logger = logging.getLogger(__name__)
@@ -40,6 +44,8 @@ class MainWindow(QMainWindow):
         self._linker = LinkerService()
         self._export = ExportService()
         self._theme = get_theme_service()
+        self._dashboard = get_dashboard_service()
+        self._orphans = get_orphan_collector_service()
         self._layout = LayoutService()
 
         self.setWindowTitle("Zettelkasten")
@@ -58,12 +64,14 @@ class MainWindow(QMainWindow):
         self._build_statusbar()
         self._setup_tray_and_hotkey()
         self._setup_sync()
+        self._build_startup_dashboard()
 
         # 프레임리스 창 가장자리 리사이즈 핸들.
         self._resizer = FramelessResizer(self)
         self._resizer.reposition()
 
         self._refresh_status()
+        QTimer.singleShot(0, self._show_weekly_orphans)
 
     def _apply_theme(self) -> None:
         """현재 테마를 창에 적용한다."""
@@ -74,6 +82,8 @@ class MainWindow(QMainWindow):
         self._apply_rounded_mask()
         if getattr(self, "_resizer", None) is not None:
             self._resizer.reposition()
+        if getattr(self, "_startup_dashboard", None) is not None:
+            self._startup_dashboard.setGeometry(self.rect())
 
     def _apply_rounded_mask(self) -> None:
         """프레임리스 창의 네 모서리를 둥글게 잘라낸다."""
@@ -182,6 +192,9 @@ class MainWindow(QMainWindow):
         file_menu.addAction(act_quit)
 
         self._view_menu = menubar.addMenu("보기")
+        act_orphans = QAction("연결 안 된 아이디어 보기", self)
+        act_orphans.triggered.connect(lambda: self._show_orphans(mark_checked=False))
+        self._view_menu.addAction(act_orphans)
 
         settings_menu = menubar.addMenu("설정")
         act_settings = QAction("설정…", self)
@@ -207,6 +220,17 @@ class MainWindow(QMainWindow):
     def _open_settings(self) -> None:
         dialog = SettingsDialog(self, theme=self._theme)
         dialog.exec()
+
+    def _build_startup_dashboard(self) -> None:
+        """설정된 색상/이미지로 첫 화면 오버레이를 올린다."""
+        self._startup_dashboard = StartupDashboardOverlay(
+            self._dashboard.welcome_color(),
+            self._dashboard.welcome_image_path(),
+            self,
+        )
+        self._startup_dashboard.setGeometry(self.rect())
+        self._startup_dashboard.raise_()
+        self._startup_dashboard.show()
 
 
     def _build_docks(self) -> None:
@@ -363,6 +387,26 @@ class MainWindow(QMainWindow):
         if note_id:
             self._explorer.select_note(note_id)
             self._on_note_selected(note_id)
+
+    def _show_weekly_orphans(self) -> None:
+        if self._orphans.is_due():
+            self._show_orphans(mark_checked=True)
+
+    def _show_orphans(self, mark_checked: bool = True) -> None:
+        notes = self._orphans.collect_orphans()
+        if mark_checked:
+            self._orphans.mark_checked()
+        if not notes:
+            return
+        self._orphan_dialog = OrphanNotesDialog(notes, self)
+        self._orphan_dialog.note_requested.connect(self._open_orphan_note)
+        self._orphan_dialog.show()
+        self._orphan_dialog.raise_()
+        self._orphan_dialog.activateWindow()
+
+    def _open_orphan_note(self, note_id: str) -> None:
+        self._explorer.select_note(note_id)
+        self._on_note_selected(note_id)
 
     def _refresh_status(self) -> None:
         count = len(self._repo.list_all())

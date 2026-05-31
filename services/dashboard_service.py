@@ -9,15 +9,26 @@
 from __future__ import annotations
 
 import logging
+import json
+from pathlib import Path
 
 from PySide6.QtCore import QObject, Signal
+from PySide6.QtGui import QColor
 from sqlalchemy import func, select
 
 from core.note import Note
 from core.tag import Tag, note_tags
+from config.settings import APP_DIR
 from db.database import get_session
 
 logger = logging.getLogger(__name__)
+
+DASHBOARD_CONFIG_PATH = APP_DIR / "dashboard.json"
+
+DEFAULT_DASHBOARD_SETTINGS: dict[str, str] = {
+    "welcome_color": "#f5ead7",
+    "welcome_image_path": "",
+}
 
 # 노트 유형(스키마 CHECK 제약과 동일한 순서)과 한글 라벨.
 NOTE_TYPE_LABELS: dict[str, str] = {
@@ -43,9 +54,16 @@ def _empty_stats() -> dict:
 
 
 class DashboardService(QObject):
-    """로컬 DB 의 집계 통계를 수집하는 읽기 전용 서비스."""
+    """로컬 DB 의 집계 통계와 첫 화면 설정을 관리하는 서비스."""
 
     stats_changed = Signal()
+    settings_changed = Signal()
+
+    def __init__(self, path: Path | str = DASHBOARD_CONFIG_PATH) -> None:
+        super().__init__()
+        self._path = Path(path)
+        self._settings = dict(DEFAULT_DASHBOARD_SETTINGS)
+        self.load_settings()
 
     def collect_stats(self) -> dict:
         """현재 DB 상태의 통계 딕셔너리를 반환한다.
@@ -96,6 +114,61 @@ class DashboardService(QObject):
             logger.exception("대시보드 통계 수집 실패 — 빈 통계를 사용합니다.")
             return _empty_stats()
         return stats
+
+    # ----- 첫 화면 설정 ---------------------------------------------------
+    def load_settings(self) -> dict[str, str]:
+        """저장된 첫 화면 설정을 읽어 반환한다."""
+        try:
+            if self._path.exists():
+                data = json.loads(self._path.read_text(encoding="utf-8"))
+                if isinstance(data, dict):
+                    color = data.get("welcome_color")
+                    if isinstance(color, str) and QColor(color).isValid():
+                        self._settings["welcome_color"] = color
+                    image_path = data.get("welcome_image_path")
+                    if isinstance(image_path, str):
+                        self._settings["welcome_image_path"] = image_path
+        except (OSError, ValueError):
+            logger.exception("dashboard.json 로드 실패 — 기본값을 사용합니다.")
+        return dict(self._settings)
+
+    def save_settings(self) -> None:
+        """현재 첫 화면 설정을 ``dashboard.json`` 에 기록한다."""
+        try:
+            self._path.parent.mkdir(parents=True, exist_ok=True)
+            self._path.write_text(
+                json.dumps(self._settings, ensure_ascii=False, indent=2),
+                encoding="utf-8")
+        except OSError:
+            logger.exception("dashboard.json 저장 실패")
+
+    @property
+    def settings(self) -> dict[str, str]:
+        return dict(self._settings)
+
+    def welcome_color(self) -> str:
+        return self._settings.get(
+            "welcome_color", DEFAULT_DASHBOARD_SETTINGS["welcome_color"])
+
+    def welcome_image_path(self) -> str:
+        return self._settings.get("welcome_image_path", "")
+
+    def set_welcome_color(self, color: str) -> None:
+        if not color or not QColor(color).isValid():
+            return
+        if self._settings.get("welcome_color") == color:
+            return
+        self._settings["welcome_color"] = color
+        self.save_settings()
+        self.settings_changed.emit()
+
+    def set_welcome_image_path(self, path: str) -> None:
+        path = path or ""
+        if self._settings.get("welcome_image_path") == path:
+            return
+        self._settings["welcome_image_path"] = path
+        self.save_settings()
+        self.settings_changed.emit()
 
 
 def _count_table(session, table: str) -> int:
