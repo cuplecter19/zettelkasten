@@ -99,7 +99,7 @@ class ExplorerPanel(QWidget):
             "QPushButton {"
             f" background-color: {color}; color: #ffffff; border: none;"
             " border-radius: 12px; padding: 5px 14px; font-weight: bold; }"
-            "QPushButton:checked { border: 2px solid rgba(0,0,0,0.25); }"
+            "QPushButton:checked { border: none; }"
         )
 
     def set_query(self, query: str) -> None:
