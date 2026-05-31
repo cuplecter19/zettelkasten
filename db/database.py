@@ -31,10 +31,10 @@ SYNC_COLUMNS: list[tuple[str, str, str]] = [
 
 # 전체 스키마 정의(노트/FTS5/트리거/태그/링크/PDF/분류 캐시).
 SCHEMA_STATEMENTS: list[str] = [
+    "DROP TRIGGER IF EXISTS notes_ai",
+    "DROP TRIGGER IF EXISTS notes_au",
+    "DROP TRIGGER IF EXISTS notes_ad",
     """
-    DROP TRIGGER IF EXISTS notes_ai;
-    DROP TRIGGER IF EXISTS notes_au;
-    DROP TRIGGER IF EXISTS notes_ad;
 
     CREATE TABLE IF NOT EXISTS notes (
         id          TEXT PRIMARY KEY,
