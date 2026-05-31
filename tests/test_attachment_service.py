@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import fitz
+from pathlib import Path
+
 from PySide6.QtGui import QImage
 
 from db.repositories.attachment_repo import AttachmentRepository
@@ -78,6 +80,19 @@ def test_first_image_for_note(qtbot, db, tmp_path):
     first = repo.first_image_for_note(note.id)
     assert first is not None and first.id == img.id
     assert repo.has_attachments(note.id) is True
+
+
+def test_delete_attachment_removes_record_and_file(qtbot, db, tmp_path):
+    note = NoteRepository().create("제목", "본문", "IDEA")
+    svc = AttachmentService(base_dir=tmp_path / "attachments")
+    src = _make_image(tmp_path / "pic.png")
+    att = svc.add_attachment(note.id, src)
+    stored_path = Path(att.file_path)
+
+    svc.delete_attachment(att.id)
+
+    assert AttachmentRepository().get_by_id(att.id) is None
+    assert not stored_path.exists()
 
 
 def test_add_attachment_missing_file_raises(qtbot, db, tmp_path):

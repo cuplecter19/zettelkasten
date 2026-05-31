@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 import logging
+from pathlib import Path
 
 from PySide6.QtCore import QEvent, Qt, QThread, Signal
+from PySide6.QtGui import QPixmap
 from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QLabel,
                                QLineEdit, QMessageBox, QPushButton, QTextBrowser,
                                QTextEdit, QToolButton, QVBoxLayout, QWidget)
@@ -44,6 +46,73 @@ class _ThumbnailWorker(QThread):
         except Exception:
             logger.exception("썸네일 워커 실패")
         self.done.emit(self._attachment_id)
+
+
+class ImageAttachmentCard(QFrame):
+    """첨부 이미지를 입력창 너비에 맞춰 표시하고 호버 시 삭제 버튼을 보여준다."""
+
+    delete_requested = Signal(str)
+
+    def __init__(self, attachment, max_width: int, parent=None) -> None:
+        super().__init__(parent)
+        self.attachment_id = attachment.id
+        self.file_path = attachment.file_path
+        self._pixmap = QPixmap(self.file_path)
+        self._max_width = max_width
+        self.setObjectName("ImageAttachmentCard")
+        self.setMouseTracking(True)
+        self.setStyleSheet(
+            "#ImageAttachmentCard { border: none; background: transparent; }"
+            "#ImageAttachmentCard QToolButton { background-color: rgba(0,0,0,160);"
+            " color: white; border-radius: 10px; padding: 2px 6px; }")
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        self._image = QLabel(self)
+        self._image.setAlignment(Qt.AlignLeft | Qt.AlignTop)
+        layout.addWidget(self._image)
+
+        self._delete_btn = QToolButton(self)
+        self._delete_btn.setText("삭제")
+        self._delete_btn.setCursor(Qt.PointingHandCursor)
+        self._delete_btn.hide()
+        self._delete_btn.clicked.connect(
+            lambda _checked=False: self.delete_requested.emit(self.attachment_id))
+        self.set_max_width(max_width)
+
+    def set_max_width(self, width: int) -> None:
+        self._max_width = max(80, width)
+        self.setMaximumWidth(self._max_width)
+        if self._pixmap.isNull():
+            self._image.setText(Path(self.file_path).name)
+            return
+        pixmap = self._pixmap
+        if pixmap.width() > self._max_width:
+            pixmap = pixmap.scaledToWidth(self._max_width, Qt.SmoothTransformation)
+        self._image.setPixmap(pixmap)
+        self._image.setFixedSize(pixmap.size())
+        self.setFixedWidth(pixmap.width())
+        self._position_delete_button()
+
+    def enterEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        self._delete_btn.show()
+        self._position_delete_button()
+        super().enterEvent(event)
+
+    def leaveEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        self._delete_btn.hide()
+        super().leaveEvent(event)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        super().resizeEvent(event)
+        self._position_delete_button()
+
+    def _position_delete_button(self) -> None:
+        self._delete_btn.adjustSize()
+        margin = 8
+        self._delete_btn.move(
+            max(margin, self.width() - self._delete_btn.width() - margin),
+            margin)
 
 
 class EditorPanel(QWidget):
@@ -118,6 +187,7 @@ class EditorPanel(QWidget):
         self._attach_container = QWidget(self)
         self._attach_layout = QVBoxLayout(self._attach_container)
         self._attach_layout.setContentsMargins(0, 0, 0, 0)
+        self._attach_layout.setSpacing(8)
         layout.addWidget(self._attach_container)
 
         # 태그 칩 영역.
@@ -203,6 +273,14 @@ class EditorPanel(QWidget):
         cursor.insertText(f"{prefix}![]({path})\n")
         self._body.setTextCursor(cursor)
 
+    def _remove_image_markdown(self, path: str) -> None:
+        body = self._body.toPlainText()
+        marker = f"![]({path})"
+        if marker not in body:
+            return
+        lines = [line for line in body.splitlines() if line.strip() != marker]
+        self._body.setPlainText("\n".join(lines))
+
     def _start_thumbnail_worker(self, attachment_id: str) -> None:
         worker = _ThumbnailWorker(self._attachments, attachment_id, self)
         worker.done.connect(self._on_thumbnail_done)
@@ -228,14 +306,23 @@ class EditorPanel(QWidget):
                 widget.deleteLater()
 
     def _refresh_attachments(self) -> None:
-        """PDF/기타 첨부를 카드로 표시한다(이미지는 본문에 인라인)."""
+        """첨부를 카드로 표시한다. 이미지는 입력창 너비에 맞춰 렌더링한다."""
         self._clear_attachment_cards()
         if self._current_id is None:
             return
         for att in self._attachments.list_for_note(self._current_id):
             if att.file_type == "image":
-                continue
-            self._attach_layout.addWidget(self._build_attachment_card(att))
+                self._attach_layout.addWidget(self._build_image_card(att))
+            else:
+                self._attach_layout.addWidget(self._build_attachment_card(att))
+
+    def _image_max_width(self) -> int:
+        return max(80, self._body.viewport().width())
+
+    def _build_image_card(self, attachment) -> ImageAttachmentCard:
+        card = ImageAttachmentCard(attachment, self._image_max_width(), self)
+        card.delete_requested.connect(self._delete_attachment)
+        return card
 
     def _build_attachment_card(self, attachment) -> QFrame:
         from pathlib import Path
@@ -253,6 +340,23 @@ class EditorPanel(QWidget):
             lambda _checked=False, aid=attachment.id: self._open_attachment(aid))
         row.addWidget(open_btn)
         return card
+
+    def _delete_attachment(self, attachment_id: str) -> None:
+        attachment = next(
+            (att for att in self._attachments.list_for_note(self._current_id)
+             if att.id == attachment_id),
+            None) if self._current_id is not None else None
+        try:
+            if attachment is not None and attachment.file_type == "image":
+                self._remove_image_markdown(attachment.file_path)
+            self._attachments.delete_attachment(attachment_id)
+            self._save()
+            self._refresh_attachments()
+            if self._current_id is not None:
+                self.attachment_added.emit(self._current_id)
+        except Exception:
+            logger.exception("첨부 삭제 실패")
+            QMessageBox.warning(self, "오류", "첨부 파일을 삭제할 수 없습니다.")
 
     def _open_attachment(self, attachment_id: str) -> None:
         try:
@@ -285,6 +389,13 @@ class EditorPanel(QWidget):
         else:
             self._body.setVisible(True)
             self._preview.setVisible(False)
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        super().resizeEvent(event)
+        for index in range(self._attach_layout.count()):
+            widget = self._attach_layout.itemAt(index).widget()
+            if isinstance(widget, ImageAttachmentCard):
+                widget.set_max_width(self._image_max_width())
 
     # ----- 분류 제안 ------------------------------------------------------
     def _update_suggestion_banner(self) -> None:

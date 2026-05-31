@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QSize, Qt, Signal
+from PySide6.QtCore import QEasingCurve, QPropertyAnimation, QSize, Qt, Signal
 from PySide6.QtWidgets import (QAbstractItemView, QButtonGroup, QHBoxLayout,
                                QListWidget, QListWidgetItem, QMessageBox,
                                QPushButton, QVBoxLayout, QWidget)
@@ -18,6 +18,33 @@ from ui.widgets.note_card import NoteCard
 logger = logging.getLogger(__name__)
 
 _FILTERS = ["전체", "LEARNING", "IDEA", "MOOD", "ARCHIVE"]
+
+
+class SmoothScrollListWidget(QListWidget):
+    """휠 스크롤을 짧은 애니메이션으로 부드럽게 처리하는 목록."""
+
+    def __init__(self, parent=None) -> None:
+        super().__init__(parent)
+        self.setVerticalScrollMode(QAbstractItemView.ScrollPerPixel)
+        self._scroll_animation = QPropertyAnimation(
+            self.verticalScrollBar(), b"value", self)
+        self._scroll_animation.setDuration(180)
+        self._scroll_animation.setEasingCurve(QEasingCurve.OutCubic)
+
+    def wheelEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        delta = event.pixelDelta().y() or event.angleDelta().y()
+        if delta == 0:
+            super().wheelEvent(event)
+            return
+        bar = self.verticalScrollBar()
+        step = max(bar.singleStep() * 6, 80)
+        target = bar.value() - int(delta / 120 * step)
+        target = max(bar.minimum(), min(bar.maximum(), target))
+        self._scroll_animation.stop()
+        self._scroll_animation.setStartValue(bar.value())
+        self._scroll_animation.setEndValue(target)
+        self._scroll_animation.start()
+        event.accept()
 
 
 class ExplorerPanel(QWidget):
@@ -54,7 +81,7 @@ class ExplorerPanel(QWidget):
         filter_bar.addStretch(1)
         layout.addLayout(filter_bar)
 
-        self._list = QListWidget(self)
+        self._list = SmoothScrollListWidget(self)
         self._list.itemClicked.connect(self._on_item_clicked)
         self._list.setSpacing(8)
         # 드래그 앤 드롭으로 순서 변경 활성화(내부 이동).

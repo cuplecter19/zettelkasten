@@ -132,6 +132,19 @@ class AttachmentService:
     def list_for_note(self, note_id: str) -> list[Attachment]:
         return self._repo.list_for_note(note_id)
 
+    def delete_attachment(self, attachment_id: str) -> None:
+        """첨부 레코드와 저장된 파일을 삭제한다."""
+        attachment = self._repo.get_by_id(attachment_id)
+        if attachment is None:
+            return
+        file_path = Path(attachment.file_path)
+        self._repo.delete(attachment_id)
+        try:
+            if file_path.is_file():
+                file_path.unlink()
+        except OSError:
+            logger.exception("첨부 파일 삭제 실패: %s", file_path)
+
     def open_attachment(self, attachment_id: str) -> None:
         """시스템 기본 뷰어로 첨부 파일을 연다."""
         attachment = self._repo.get_by_id(attachment_id)

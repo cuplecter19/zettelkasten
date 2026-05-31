@@ -2,10 +2,21 @@
 
 from __future__ import annotations
 
+from PySide6.QtGui import QImage
+
+from db.repositories.attachment_repo import AttachmentRepository
 from db.repositories.note_repo import NoteRepository
+from services.attachment_service import AttachmentService
 from services.css_snippet_service import CssSnippetService
 from services.markdown_style_service import MarkdownStyleService
-from ui.panels.editor_panel import EditorPanel
+from ui.panels.editor_panel import EditorPanel, ImageAttachmentCard
+
+
+def _make_image(path) -> str:
+    image = QImage(640, 320, QImage.Format_RGB32)
+    image.fill(0x3366FF)
+    image.save(str(path), "PNG")
+    return str(path)
 
 
 def test_markdown_toggle_switches_views(qtbot, db):
@@ -34,6 +45,28 @@ def test_insert_image_markdown_appends_link(qtbot, db):
 
     panel._insert_image_markdown("/tmp/x/pic.png")
     assert "![](/tmp/x/pic.png)" in panel._body.toPlainText()
+
+
+def test_image_attachment_renders_and_deletes(qtbot, db, tmp_path):
+    note = NoteRepository().create("제목", "본문", "IDEA")
+    svc = AttachmentService(base_dir=tmp_path / "attachments")
+    att = svc.add_attachment(note.id, _make_image(tmp_path / "pic.png"))
+    panel = EditorPanel()
+    panel._attachments = svc
+    qtbot.addWidget(panel)
+    panel.resize(320, 500)
+    panel.load_note(note)
+    panel._insert_image_markdown(att.file_path)
+
+    card = panel._attach_layout.itemAt(0).widget()
+    assert isinstance(card, ImageAttachmentCard)
+    assert card.width() <= panel._body.viewport().width()
+    assert not card._delete_btn.isVisible()
+
+    panel._delete_attachment(att.id)
+
+    assert AttachmentRepository().get_by_id(att.id) is None
+    assert f"![]({att.file_path})" not in panel._body.toPlainText()
 
 
 def test_loading_note_resets_markdown_toggle(qtbot, db):
