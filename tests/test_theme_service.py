@@ -11,6 +11,7 @@ from services.theme_service import (DEFAULT_THEME, ThemeService,
 def test_defaults_loaded(tmp_path):
     svc = ThemeService(tmp_path / "theme.json")
     assert svc.colors == DEFAULT_THEME
+    assert svc.get_color("background") == "#ffffff"
     assert svc.get_color("accent") == DEFAULT_THEME["accent"]
 
 
@@ -60,3 +61,11 @@ def test_build_stylesheet_uses_colors():
     qss = build_stylesheet({"background": "#010203", "accent": "#040506"})
     assert "#010203" in qss
     assert "#040506" in qss
+
+
+def test_build_stylesheet_paints_settings_background():
+    qss = build_stylesheet({"background": "#010203"})
+    assert "QDialog#SettingsDialog" in qss
+    assert "QWidget#SettingsPage" in qss
+    assert "QListWidget#SettingsCategoryList" in qss
+    assert "QStackedWidget#SettingsStack" in qss

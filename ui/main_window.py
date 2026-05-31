@@ -47,7 +47,6 @@ class MainWindow(QMainWindow):
 
         # 기본 제목 표시줄 제거(커스텀 타이틀바 사용).
         self.setWindowFlag(Qt.FramelessWindowHint, True)
-        self.setAttribute(Qt.WA_TranslucentBackground, True)
         self._apply_theme()
         self._theme.theme_changed.connect(self._apply_theme)
 
