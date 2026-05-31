@@ -1,0 +1,10 @@
+PySide6>=6.7.0
+SQLAlchemy>=2.0
+alembic>=1.13
+pymupdf>=1.24
+scikit-learn>=1.4
+numpy>=1.26
+networkx>=3.3
+keyboard>=0.13
+pytest>=8.0
+pytest-qt>=4.4
