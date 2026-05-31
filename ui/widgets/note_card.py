@@ -32,19 +32,40 @@ class NoteCard(QFrame):
 
         color = note.color_hint or get_theme_service().get_card_color(
             note.note_type) or NOTE_TYPE_COLORS.get(note.note_type, "#777777")
-        self.setStyleSheet(
-            "#NoteCard { border-left: 6px solid %s; border-radius: 8px;"
-            " background-color: rgba(255,255,255,0.75); }" % color
-        )
+        self.setStyleSheet("#NoteCard { background-color: transparent; }")
 
         outer = QHBoxLayout(self)
-        outer.setContentsMargins(8, 6, 8, 6)
-        outer.setSpacing(8)
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
+
+        color_chip = QFrame(self)
+        color_chip.setFixedWidth(30)
+        color_chip.setStyleSheet(
+            "QFrame {"
+            f" background-color: {color};"
+            " border-top-left-radius: 8px;"
+            " border-bottom-left-radius: 8px;"
+            "}"
+        )
+        outer.addWidget(color_chip)
+
+        content = QFrame(self)
+        content.setObjectName("NoteCardContent")
+        content.setStyleSheet(
+            "#NoteCardContent {"
+            " background-color: rgba(255,255,255,0.85);"
+            " border-top-right-radius: 8px;"
+            " border-bottom-right-radius: 8px;"
+            "}"
+        )
+        content_layout = QHBoxLayout(content)
+        content_layout.setContentsMargins(10, 8, 8, 8)
+        content_layout.setSpacing(8)
 
         # 좌측 썸네일/아이콘(첨부가 있을 때만).
         thumb_label = self._build_thumbnail(thumbnail, has_pdf)
         if thumb_label is not None:
-            outer.addWidget(thumb_label, 0)
+            content_layout.addWidget(thumb_label, 0)
 
         body = QVBoxLayout()
         title = note.title or "제목 없음"
@@ -60,7 +81,7 @@ class NoteCard(QFrame):
         preview = QLabel(preview_text)
         preview.setStyleSheet("color: #8a8f98;")
         body.addWidget(preview)
-        outer.addLayout(body, 1)
+        content_layout.addLayout(body, 1)
 
         # 우측 끝 삭제 버튼(시안과 동일하게 빨간색 텍스트).
         self._delete_btn = QToolButton(self)
@@ -73,7 +94,8 @@ class NoteCard(QFrame):
             " font-size: 11px; }")
         self._delete_btn.clicked.connect(
             lambda: self.delete_requested.emit(self.note_id))
-        outer.addWidget(self._delete_btn, 0, Qt.AlignTop)
+        content_layout.addWidget(self._delete_btn, 0, Qt.AlignTop)
+        outer.addWidget(content, 1)
 
     def _build_thumbnail(self, thumbnail: bytes | None,
                          has_pdf: bool) -> QLabel | None:
