@@ -13,12 +13,21 @@ from pathlib import Path
 from typing import Iterator
 
 from sqlalchemy import create_engine, event, text
-from sqlalchemy.engine import Engine
+from sqlalchemy.engine import Connection, Engine
 from sqlalchemy.orm import Session, sessionmaker
 
 from config.settings import APP_DIR, DB_PATH, PDF_DIR
 
 logger = logging.getLogger(__name__)
+
+# 동기화 전용 컬럼(서버·로컬 공용). 기존 DB 에도 누락 시 ALTER 로 추가한다.
+# 각 항목: (테이블, 컬럼, 컬럼 정의)
+SYNC_COLUMNS: list[tuple[str, str, str]] = [
+    ("notes", "last_synced_by", "TEXT"),
+    ("notes", "deleted_at", "DATETIME"),
+    ("pdf_assets", "last_synced_by", "TEXT"),
+    ("pdf_assets", "deleted_at", "DATETIME"),
+]
 
 # 전체 스키마 정의(노트/FTS5/트리거/태그/링크/PDF/분류 캐시).
 SCHEMA_STATEMENTS: list[str] = [
@@ -113,6 +122,21 @@ def _enable_sqlite_fks(dbapi_connection, _connection_record) -> None:
     cursor.close()
 
 
+def ensure_sync_columns(conn: Connection) -> None:
+    """동기화 전용 컬럼이 없으면 ALTER 로 추가한다(가드된 마이그레이션).
+
+    서버·로컬 양쪽에서 재사용한다. 이미 존재하는 DB 파일에도 안전하게 적용된다.
+    """
+    for table, column, definition in SYNC_COLUMNS:
+        existing = {
+            row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))
+        }
+        if column not in existing:
+            conn.execute(
+                text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
+            logger.info("Added sync column %s.%s", table, column)
+
+
 def init_db(db_path: Path | str = DB_PATH) -> Engine:
     """엔진/세션 팩토리를 초기화하고 스키마를 생성한다.
 
@@ -135,6 +159,7 @@ def init_db(db_path: Path | str = DB_PATH) -> Engine:
     with _engine.begin() as conn:
         for statement in SCHEMA_STATEMENTS:
             conn.execute(text(statement))
+        ensure_sync_columns(conn)
 
     logger.info("Database initialised at %s", db_path)
     return _engine

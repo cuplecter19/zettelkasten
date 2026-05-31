@@ -13,8 +13,10 @@ from PySide6.QtWidgets import (QDockWidget, QFileDialog, QLabel, QLineEdit,
                                QSystemTrayIcon, QToolBar, QVBoxLayout, QWidget)
 
 from db.repositories.note_repo import NoteRepository
+from config import settings
 from services.export_service import ExportService
 from services.linker import LinkerService
+from services.sync_service import SyncService
 from ui.panels.editor_panel import EditorPanel
 from ui.panels.explorer_panel import ExplorerPanel
 from ui.panels.graph_panel import GraphPanel
@@ -61,6 +63,7 @@ class MainWindow(QMainWindow):
         self._build_docks()
         self._build_statusbar()
         self._setup_tray_and_hotkey()
+        self._setup_sync()
 
         self._refresh_status()
 
@@ -124,6 +127,10 @@ class MainWindow(QMainWindow):
         act_gexf.triggered.connect(self._export_gexf)
         file_menu.addAction(act_gexf)
         file_menu.addSeparator()
+        act_sync = QAction("지금 동기화", self)
+        act_sync.triggered.connect(self._sync_now)
+        file_menu.addAction(act_sync)
+        file_menu.addSeparator()
         act_quit = QAction("종료", self)
         act_quit.triggered.connect(self.close)
         file_menu.addAction(act_quit)
@@ -149,6 +156,27 @@ class MainWindow(QMainWindow):
     def _build_statusbar(self) -> None:
         self._status_label = QLabel("", self)
         self.statusBar().addWidget(self._status_label)
+
+        # 동기화 상태 표시(이모지 미사용): 색상 점 + 텍스트.
+        self._sync_dot = QLabel(self)
+        self._sync_dot.setFixedSize(12, 12)
+        self._sync_text = QLabel("오프라인", self)
+        self.statusBar().addPermanentWidget(self._sync_dot)
+        self.statusBar().addPermanentWidget(self._sync_text)
+        self._update_sync_indicator("offline")
+
+    _SYNC_STATES = {
+        "online":  ("#3CB371", "연결됨"),
+        "offline": ("#C0392B", "오프라인"),
+        "syncing": ("#E0A030", "동기화 중"),
+    }
+
+    def _update_sync_indicator(self, state: str) -> None:
+        color, label = self._SYNC_STATES.get(state, self._SYNC_STATES["offline"])
+        # 바닐라 CSS 로 원형 점을 그린다(이모지 대신).
+        self._sync_dot.setStyleSheet(
+            f"background-color: {color}; border-radius: 6px;")
+        self._sync_text.setText(label)
 
     def _setup_tray_and_hotkey(self) -> None:
         icon = self.style().standardIcon(QStyle.SP_FileDialogListView)
@@ -178,6 +206,36 @@ class MainWindow(QMainWindow):
         self._hotkey = HotkeyManager()
         self._hotkey.triggered.connect(self._quick.open_fresh)
         self._hotkey.start()
+
+    def _setup_sync(self) -> None:
+        """동기화 서비스를 초기화하고, 설정되어 있으면 자동 동기화를 시작한다."""
+        self._sync: SyncService | None = None
+        try:
+            self._sync = SyncService(
+                server_url=settings.SYNC_SERVER_URL,
+                device_id=settings.DEVICE_ID,
+                token=settings.SYNC_TOKEN,
+            )
+            self._sync.status_changed.connect(self._update_sync_indicator)
+            if self._sync_configured():
+                self._sync.start_auto_sync(settings.SYNC_INTERVAL)
+                self._sync.run_full_sync_async()
+        except Exception:
+            logger.exception("동기화 초기화 실패 — 로컬 모드로 계속합니다.")
+
+    def _sync_configured(self) -> bool:
+        """서버 URL/토큰이 실제 값으로 설정되었는지 확인한다."""
+        url = settings.SYNC_SERVER_URL or ""
+        return bool(url) and "<" not in url and bool(settings.SYNC_TOKEN)
+
+    def _sync_now(self) -> None:
+        """메뉴 "지금 동기화": 백그라운드 스레드에서 즉시 동기화한다."""
+        if self._sync is None or not self._sync_configured():
+            QMessageBox.information(
+                self, "동기화", "동기화 서버가 설정되지 않았습니다.\n"
+                "config/settings.py 의 SYNC_SERVER_URL/SYNC_TOKEN 을 확인하세요.")
+            return
+        self._sync.run_full_sync_async()
 
     # ----- 동작 -----------------------------------------------------------
     def _on_search(self, text: str) -> None:
@@ -269,6 +327,17 @@ class MainWindow(QMainWindow):
 
     # ----- 종료 -----------------------------------------------------------
     def closeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        try:
+            if getattr(self, "_sync", None) is not None and self._sync_configured():
+                # 종료 전 마지막 동기화 시도(블로킹 최소화).
+                try:
+                    if self._sync.is_online():
+                        self._sync.full_sync()
+                except Exception:
+                    logger.debug("종료 시 동기화 실패", exc_info=True)
+                self._sync.stop_auto_sync()
+        except Exception:
+            logger.debug("Sync shutdown failed", exc_info=True)
         try:
             self._hotkey.stop()
         except Exception:

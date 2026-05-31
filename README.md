@@ -98,3 +98,107 @@ QT_QPA_PLATFORM=offscreen python -m pytest -q
    `ReadDirectoryChangesW` 를 자동 선택하므로 OS별 별도 설정은 필요 없습니다.
 4. `.vscode/` 폴더는 팀 공유 설정이므로 `.gitignore` 에 추가하지 않는 것을
    권장합니다.
+
+## 클라우드 동기화 서버 (Oracle Cloud + OCIR)
+
+메인 PC와 서브 랩탑에서 동일한 노트·태그·PDF를 공유하기 위한 백엔드 동기화
+서버입니다. 기존 PySide6 GUI와 로컬 SQLite DB는 그대로 유지하며, 로컬 앱이
+`services/sync_service.py` 를 통해 서버와 **양방향 동기화**합니다. 오프라인 시
+로컬 DB로 독립 작동하고, 온라인 복귀 시 자동 동기화합니다. 충돌은 `updated_at`
+기준 **최신 우선(Last Write Wins)** 으로 처리합니다.
+
+### 구성 요소
+
+| 위치 | 설명 |
+|------|------|
+| `server/` | FastAPI 동기화 서버(클라우드 배포 대상) |
+| `services/sync_service.py` | 로컬 앱의 동기화 클라이언트(QThread 기반) |
+| `db/schema_shared.sql` | 서버·로컬 공용 스키마 |
+
+### 1. 서버 로컬 실행 및 테스트
+
+```bash
+cd server
+pip install -r requirements_server.txt
+# 인증할 기기 목록과 시크릿을 환경변수로 지정합니다.
+export SECRET_KEY="$(python -c 'import secrets; print(secrets.token_hex(32))')"
+export ALLOWED_DEVICES="main-pc,laptop"
+uvicorn main_server:app --host 0.0.0.0 --port 8000
+```
+
+- 헬스 체크: `GET http://localhost:8000/api/health`
+- 토큰 발급: `POST /api/auth/token` 본문 `{"device_id": "main-pc"}`
+- 서버 DB 파일은 기본적으로 `/opt/zettelkasten/server.db`, PDF는
+  `/opt/zettelkasten/pdfs/` 에 저장됩니다(환경변수 `ZK_SERVER_DIR`,
+  `ZK_SERVER_DB`, `ZK_SERVER_PDF_DIR` 로 변경 가능).
+
+### 2. Docker 이미지 빌드
+
+`Dockerfile` 은 공용 스키마(`db/schema_shared.sql`)를 포함하기 위해 **저장소
+루트를 빌드 컨텍스트**로 사용합니다.
+
+```bash
+# 저장소 루트에서 실행
+docker build -f server/Dockerfile -t zettelkasten-sync:latest .
+```
+
+### 3. OCIR(Oracle Cloud Infrastructure Registry) 푸시
+
+```bash
+# 1) OCIR 로그인 (사용자 인증 토큰을 비밀번호로 사용)
+#    사용자명 형식: <object-storage-namespace>/<oci-username>
+docker login <region-key>.ocir.io
+#    예: ap-seoul-1 → icn.ocir.io, ap-chuncheon-1 → yny.ocir.io
+
+# 2) 이미지에 OCIR 태그 부여
+docker tag zettelkasten-sync:latest \
+  <region-key>.ocir.io/<namespace>/zettelkasten-sync:latest
+
+# 3) 푸시
+docker push <region-key>.ocir.io/<namespace>/zettelkasten-sync:latest
+```
+
+### 4. Ampere A1 인스턴스(Ubuntu 22.04, ARM64)에 배포
+
+```bash
+# 서버에서 OCIR 로그인 후 이미지 pull & run
+docker login <region-key>.ocir.io
+docker pull <region-key>.ocir.io/<namespace>/zettelkasten-sync:latest
+
+docker run -d --name zk-sync \
+  -p 8000:8000 \
+  -e SECRET_KEY="<배포용 시크릿>" \
+  -e ALLOWED_DEVICES="main-pc,laptop" \
+  -v /opt/zettelkasten:/opt/zettelkasten \
+  <region-key>.ocir.io/<namespace>/zettelkasten-sync:latest
+```
+
+- 방화벽(보안 목록/NSG)에서 TCP 8000 인바운드를 허용해야 합니다.
+- `/opt/zettelkasten` 을 호스트 볼륨으로 마운트하면 컨테이너 재시작에도
+  DB·PDF가 유지됩니다.
+- **DB 백업(권장):** 일 1회 cron 등록
+  `cp /opt/zettelkasten/server.db /opt/zettelkasten/server.db.bak.$(date +%Y%m%d)`
+
+### 5. 로컬 앱 동기화 설정
+
+`config/settings.py` 의 동기화 항목을 배포 환경에 맞게 설정합니다(환경변수
+`ZK_SYNC_SERVER_URL`, `ZK_DEVICE_ID`, `ZK_SYNC_TOKEN`, `ZK_SYNC_INTERVAL` 로도
+덮어쓸 수 있습니다).
+
+```python
+SYNC_SERVER_URL = "http://<서버IP>:8000"  # 배포한 서버 주소
+DEVICE_ID       = "main-pc"               # 기기별 고유 값(서버 ALLOWED_DEVICES 와 일치)
+SYNC_TOKEN      = "<발급받은 JWT>"         # /api/auth/token 으로 발급
+SYNC_INTERVAL   = 30                       # 자동 동기화 주기(초)
+```
+
+서버 URL과 토큰이 모두 설정되면 앱 시작 시 자동 동기화가 활성화되고, 상태바
+우측에 동기화 상태(연결됨/오프라인/동기화 중)가 색상 점으로 표시됩니다. 메뉴
+**파일 → 지금 동기화** 로 즉시 동기화를 실행할 수 있습니다. 모든 HTTP 통신은
+`QThread` 에서 동기 `httpx` 클라이언트로 수행되어 UI를 멈추지 않습니다.
+
+### 6. 동기화 서버 테스트 실행
+
+```bash
+QT_QPA_PLATFORM=offscreen python -m pytest tests/test_server_sync.py tests/test_soft_delete.py -q
+```
