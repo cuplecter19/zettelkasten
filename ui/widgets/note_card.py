@@ -33,8 +33,8 @@ class NoteCard(QFrame):
         color = note.color_hint or get_theme_service().get_card_color(
             note.note_type) or NOTE_TYPE_COLORS.get(note.note_type, "#777777")
         self.setStyleSheet(
-            "#NoteCard { border-left: 5px solid %s; border-radius: 4px;"
-            " background-color: rgba(255,255,255,0.04); }" % color
+            "#NoteCard { border-left: 6px solid %s; border-radius: 8px;"
+            " background-color: rgba(255,255,255,0.75); }" % color
         )
 
         outer = QHBoxLayout(self)
@@ -58,21 +58,19 @@ class NoteCard(QFrame):
         if len(preview_text) > 60:
             preview_text = preview_text[:60] + "…"
         preview = QLabel(preview_text)
-        preview.setStyleSheet("color: #aaaaaa;")
+        preview.setStyleSheet("color: #8a8f98;")
         body.addWidget(preview)
         outer.addLayout(body, 1)
 
-        type_label = QLabel(note.note_type)
-        type_label.setAlignment(Qt.AlignTop | Qt.AlignRight)
-        type_label.setStyleSheet(f"color: {color}; font-size: 10px;")
-        outer.addWidget(type_label, 0)
-
-        # 우측 끝 삭제 버튼.
+        # 우측 끝 삭제 버튼(시안과 동일하게 빨간색 텍스트).
         self._delete_btn = QToolButton(self)
-        self._delete_btn.setText("🗑")
+        self._delete_btn.setText("삭제")
         self._delete_btn.setToolTip("이 노트를 삭제합니다")
         self._delete_btn.setAutoRaise(True)
         self._delete_btn.setCursor(Qt.PointingHandCursor)
+        self._delete_btn.setStyleSheet(
+            "QToolButton { color: #d9534f; border: none; background: transparent;"
+            " font-size: 11px; }")
         self._delete_btn.clicked.connect(
             lambda: self.delete_requested.emit(self.note_id))
         outer.addWidget(self._delete_btn, 0, Qt.AlignTop)

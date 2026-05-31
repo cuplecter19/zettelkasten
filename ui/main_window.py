@@ -71,8 +71,20 @@ class MainWindow(QMainWindow):
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         super().resizeEvent(event)
+        self._apply_rounded_mask()
         if getattr(self, "_resizer", None) is not None:
             self._resizer.reposition()
+
+    def _apply_rounded_mask(self) -> None:
+        """프레임리스 창의 네 모서리를 둥글게 잘라낸다."""
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QPainterPath, QRegion
+
+        radius = 16
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), radius, radius)
+        region = QRegion(path.toFillPolygon().toPolygon())
+        self.setMask(region)
 
     # ----- UI 구성 --------------------------------------------------------
     def _build_toolbar(self) -> None:
