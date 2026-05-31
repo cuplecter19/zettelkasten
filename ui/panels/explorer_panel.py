@@ -5,10 +5,11 @@ from __future__ import annotations
 import logging
 
 from PySide6.QtCore import QSize, Signal
-from PySide6.QtWidgets import (QButtonGroup, QHBoxLayout, QListWidget,
-                               QListWidgetItem, QPushButton, QVBoxLayout,
-                               QWidget)
+from PySide6.QtWidgets import (QAbstractItemView, QButtonGroup, QHBoxLayout,
+                               QListWidget, QListWidgetItem, QMessageBox,
+                               QPushButton, QVBoxLayout, QWidget)
 
+from db.repositories.attachment_repo import AttachmentRepository
 from db.repositories.note_repo import NoteRepository
 from services.search_service import SearchService
 from ui.widgets.note_card import NoteCard
@@ -22,13 +23,16 @@ class ExplorerPanel(QWidget):
     """유형 필터와 검색을 지원하는 노트 목록 패널."""
 
     note_selected = Signal(str)
+    note_deleted = Signal(str)
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._repo = NoteRepository()
         self._search = SearchService()
+        self._attachments = AttachmentRepository()
         self._query = ""
         self._active_type: str | None = None
+        self._suppress_reorder = False
 
         layout = QVBoxLayout(self)
 
@@ -48,6 +52,9 @@ class ExplorerPanel(QWidget):
 
         self._list = QListWidget(self)
         self._list.itemClicked.connect(self._on_item_clicked)
+        # 드래그 앤 드롭으로 순서 변경 활성화(내부 이동).
+        self._list.setDragDropMode(QAbstractItemView.InternalMove)
+        self._list.model().rowsMoved.connect(self._on_rows_moved)
         layout.addWidget(self._list, 1)
 
         self.refresh()
@@ -58,15 +65,20 @@ class ExplorerPanel(QWidget):
         self.refresh()
 
     def refresh(self) -> None:
+        # refresh 중에는 rowsMoved 시그널을 무시한다.
+        self._suppress_reorder = True
         self._list.clear()
         notes = self._collect_notes()
         for note in notes:
-            card = NoteCard(note)
+            thumbnail, has_pdf = self._card_media(note.id)
+            card = NoteCard(note, thumbnail=thumbnail, has_pdf=has_pdf)
+            card.delete_requested.connect(self._on_delete_requested)
             item = QListWidgetItem(self._list)
             item.setSizeHint(QSize(0, max(card.sizeHint().height(), 56)))
             item.setData(256, note.id)  # Qt.UserRole
             self._list.addItem(item)
             self._list.setItemWidget(item, card)
+        self._suppress_reorder = False
 
     def select_note(self, note_id: str) -> None:
         for row in range(self._list.count()):
@@ -86,6 +98,20 @@ class ExplorerPanel(QWidget):
             notes = self._repo.list_all()
         return notes
 
+    def _card_media(self, note_id: str) -> tuple[bytes | None, bool]:
+        """카드 썸네일 바이트와 PDF 보유 여부를 반환한다."""
+        try:
+            image = self._attachments.first_image_for_note(note_id)
+            if image is not None and image.thumbnail:
+                return image.thumbnail, False
+            # 이미지가 없으면 PDF 첨부 여부 확인.
+            for att in self._attachments.list_for_note(note_id):
+                if att.file_type == "pdf":
+                    return None, True
+        except Exception:
+            logger.debug("첨부 미디어 조회 실패", exc_info=True)
+        return None, False
+
     def _on_filter(self, label: str) -> None:
         self._active_type = None if label == "전체" else label
         self.refresh()
@@ -94,6 +120,47 @@ class ExplorerPanel(QWidget):
         note_id = item.data(256)
         if note_id:
             self.note_selected.emit(note_id)
+
+    # ----- 삭제 -----------------------------------------------------------
+    def _on_delete_requested(self, note_id: str) -> None:
+        """삭제 버튼 클릭: 확인 다이얼로그 후 소프트 삭제한다.
+
+        대상 사용자의 실수 방지를 위해 확인 다이얼로그를 반드시 표시한다.
+        """
+        note = self._repo.get_by_id(note_id)
+        title = (note.title if note else "") or "제목 없음"
+        answer = QMessageBox.question(
+            self, "노트 삭제",
+            f"'{title}' 노트를 삭제할까요?",
+            QMessageBox.Yes | QMessageBox.No, QMessageBox.No)
+        if answer != QMessageBox.Yes:
+            return
+        try:
+            self._repo.delete(note_id)
+        except Exception:
+            logger.exception("노트 삭제 실패")
+            QMessageBox.warning(self, "오류", "노트를 삭제하지 못했습니다.")
+            return
+        self.refresh()
+        self.note_deleted.emit(note_id)
+
+    # ----- 드래그 순서 변경 ----------------------------------------------
+    def _on_rows_moved(self, *args) -> None:
+        """드롭 완료 시 현재 목록 순서를 sort_order 로 영속화한다."""
+        if self._suppress_reorder:
+            return
+        # 검색/필터가 적용된 부분 목록에서는 순서를 저장하지 않는다.
+        if self._query.strip() or self._active_type:
+            return
+        ordered_ids = [self._list.item(row).data(256)
+                       for row in range(self._list.count())]
+        ordered_ids = [nid for nid in ordered_ids if nid]
+        try:
+            self._repo.reorder(ordered_ids)
+        except Exception:
+            logger.exception("노트 순서 저장 실패")
+        # 위젯이 이동 중 분리될 수 있으므로 다시 그린다.
+        self.refresh()
 
 
 if __name__ == "__main__":

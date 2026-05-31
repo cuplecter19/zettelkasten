@@ -97,6 +97,8 @@ class NoteRepository:
             order_cols = []
             if pinned_first:
                 order_cols.append(Note.is_pinned.desc())
+            # 수동 정렬 순서를 우선 적용하고, 동률은 선택 컬럼으로 정렬.
+            order_cols.append(Note.sort_order.asc())
             order_cols.append(column.desc())
             stmt = stmt.order_by(*order_cols)
             return list(session.scalars(stmt).all())
@@ -124,8 +126,21 @@ class NoteRepository:
             stmt = (select(Note)
                     .where(Note.note_type == note_type,
                            Note.deleted_at.is_(None))
-                    .order_by(Note.is_pinned.desc(), Note.updated_at.desc()))
+                    .order_by(Note.is_pinned.desc(), Note.sort_order.asc(),
+                              Note.updated_at.desc()))
             return list(session.scalars(stmt).all())
+
+    def reorder(self, ordered_ids: list[str]) -> None:
+        """주어진 노트 id 순서대로 ``sort_order`` 값을 0,1,2… 로 갱신한다.
+
+        드래그 앤 드롭으로 순서를 바꾼 뒤 호출한다. ``updated_at`` 은 건드리지
+        않아 정렬 변경이 동기화 충돌(LWW)에 영향을 주지 않도록 한다.
+        """
+        with get_session() as session:
+            for index, note_id in enumerate(ordered_ids):
+                note = session.get(Note, note_id)
+                if note is not None:
+                    note.sort_order = index
 
     # ----- 동기화 지원 -----------------------------------------------------
     def list_changed_since(self, since: datetime | None) -> list[Note]:
@@ -155,6 +170,8 @@ class NoteRepository:
             note.note_type = record.get("note_type", note.note_type or "IDEA")
             note.is_pinned = bool(record.get("is_pinned", note.is_pinned))
             note.color_hint = record.get("color_hint", note.color_hint)
+            if record.get("sort_order") is not None:
+                note.sort_order = record["sort_order"]
             note.updated_at = record.get("updated_at", note.updated_at)
             if record.get("created_at") is not None:
                 note.created_at = record["created_at"]

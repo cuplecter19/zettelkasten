@@ -6,42 +6,29 @@ import logging
 from datetime import datetime
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QDockWidget, QFileDialog, QLabel, QLineEdit,
                                QListWidget, QListWidgetItem, QMainWindow,
-                               QMessageBox, QPushButton, QSplitter, QStyle,
-                               QSystemTrayIcon, QToolBar, QVBoxLayout, QWidget)
+                               QMenuBar, QMessageBox, QPushButton, QSplitter,
+                               QStyle, QSystemTrayIcon, QToolBar, QVBoxLayout,
+                               QWidget)
 
 from db.repositories.note_repo import NoteRepository
 from config import settings
 from services.export_service import ExportService
 from services.linker import LinkerService
+from services.layout_service import LayoutService
 from services.sync_service import SyncService
+from services.theme_service import get_theme_service
+from ui.dialogs.settings_dialog import SettingsDialog
 from ui.panels.editor_panel import EditorPanel
 from ui.panels.explorer_panel import ExplorerPanel
 from ui.panels.graph_panel import GraphPanel
 from ui.panels.pdf_panel import PDFPanel
 from ui.widgets.quick_capture import HotkeyManager, QuickCaptureDialog
+from ui.widgets.title_bar import CustomTitleBar, FramelessResizer
 
 logger = logging.getLogger(__name__)
-
-DARK_STYLESHEET = """
-QMainWindow, QWidget { background-color: #1e1e1e; color: #e0e0e0; }
-QLineEdit, QTextEdit, QPlainTextEdit, QListWidget {
-    background-color: #2a2a2a; color: #e0e0e0; border: 1px solid #3a3a3a;
-    border-radius: 4px;
-}
-QPushButton {
-    background-color: #333333; color: #e0e0e0; border: 1px solid #444444;
-    border-radius: 4px; padding: 4px 10px;
-}
-QPushButton:hover { background-color: #3d3d3d; }
-QPushButton:checked { background-color: #4A90D9; color: white; }
-QToolBar { background-color: #252525; border: none; spacing: 6px; }
-QStatusBar { background-color: #252525; }
-QMenuBar, QMenu { background-color: #252525; color: #e0e0e0; }
-QMenu::item:selected { background-color: #4A90D9; }
-"""
 
 
 class MainWindow(QMainWindow):
@@ -52,20 +39,40 @@ class MainWindow(QMainWindow):
         self._repo = NoteRepository()
         self._linker = LinkerService()
         self._export = ExportService()
+        self._theme = get_theme_service()
+        self._layout = LayoutService()
 
         self.setWindowTitle("Zettelkasten")
         self.resize(1100, 720)
-        self.setStyleSheet(DARK_STYLESHEET)
+
+        # 기본 제목 표시줄 제거(커스텀 타이틀바 사용).
+        self.setWindowFlag(Qt.FramelessWindowHint, True)
+        self._apply_theme()
+        self._theme.theme_changed.connect(self._apply_theme)
 
         self._build_toolbar()
         self._build_central()
         self._build_menu()
+        self._build_titlebar()
         self._build_docks()
         self._build_statusbar()
         self._setup_tray_and_hotkey()
         self._setup_sync()
 
+        # 프레임리스 창 가장자리 리사이즈 핸들.
+        self._resizer = FramelessResizer(self)
+        self._resizer.reposition()
+
         self._refresh_status()
+
+    def _apply_theme(self) -> None:
+        """현재 테마를 창에 적용한다."""
+        self.setStyleSheet(self._theme.build_stylesheet())
+
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        super().resizeEvent(event)
+        if getattr(self, "_resizer", None) is not None:
+            self._resizer.reposition()
 
     # ----- UI 구성 --------------------------------------------------------
     def _build_toolbar(self) -> None:
@@ -85,14 +92,18 @@ class MainWindow(QMainWindow):
 
     def _build_central(self) -> None:
         splitter = QSplitter(Qt.Horizontal, self)
+        self._central_splitter = splitter
 
         self._explorer = ExplorerPanel(self)
         self._explorer.note_selected.connect(self._on_note_selected)
+        self._explorer.note_deleted.connect(self._on_note_deleted)
         splitter.addWidget(self._explorer)
 
         right = QSplitter(Qt.Vertical, self)
+        self._right_splitter = right
         self._editor = EditorPanel(self)
         self._editor.note_saved.connect(self._on_note_saved)
+        self._editor.attachment_added.connect(self._on_attachment_added)
         right.addWidget(self._editor)
 
         # 연결 노트 제안 영역.
@@ -113,8 +124,26 @@ class MainWindow(QMainWindow):
 
         self.setCentralWidget(splitter)
 
+        # 저장된 패널 너비를 복원하고, 이동 시 저장한다.
+        self._restore_splitter_sizes()
+        splitter.splitterMoved.connect(
+            lambda *_: self._layout.set_sizes(
+                "central_splitter", splitter.sizes()))
+        right.splitterMoved.connect(
+            lambda *_: self._layout.set_sizes(
+                "right_splitter", right.sizes()))
+
+    def _restore_splitter_sizes(self) -> None:
+        central = self._layout.get_sizes("central_splitter")
+        if central:
+            self._central_splitter.setSizes(central)
+        right = self._layout.get_sizes("right_splitter")
+        if right:
+            self._right_splitter.setSizes(right)
+
     def _build_menu(self) -> None:
-        menubar = self.menuBar()
+        menubar = QMenuBar(self)
+        self._menubar = menubar
 
         file_menu = menubar.addMenu("파일")
         act_md = QAction("노트 Markdown 내보내기", self)
@@ -136,7 +165,25 @@ class MainWindow(QMainWindow):
         file_menu.addAction(act_quit)
 
         self._view_menu = menubar.addMenu("보기")
-        menubar.addMenu("설정")
+
+        settings_menu = menubar.addMenu("설정")
+        act_settings = QAction("설정…", self)
+        act_settings.setShortcut(QKeySequence("Ctrl+,"))
+        act_settings.triggered.connect(self._open_settings)
+        settings_menu.addAction(act_settings)
+        # 단축키가 메뉴를 열지 않아도 동작하도록 창에도 등록.
+        self.addAction(act_settings)
+
+    def _build_titlebar(self) -> None:
+        """메뉴바를 포함한 커스텀 타이틀바를 창 상단에 배치한다."""
+        self._title_bar = CustomTitleBar(
+            self, title="Zettelkasten", menu_widget=self._menubar)
+        self.setMenuWidget(self._title_bar)
+
+    def _open_settings(self) -> None:
+        dialog = SettingsDialog(self, theme=self._theme)
+        dialog.exec()
+
 
     def _build_docks(self) -> None:
         self._pdf_panel = PDFPanel(self)
@@ -257,6 +304,18 @@ class MainWindow(QMainWindow):
     def _on_note_saved(self, note_id: str) -> None:
         self._explorer.refresh()
         self._explorer.select_note(note_id)
+        self._refresh_status()
+
+    def _on_attachment_added(self, note_id: str) -> None:
+        """첨부/썸네일 변경 시 리스트 카드 미디어를 갱신한다."""
+        self._explorer.refresh()
+        self._explorer.select_note(note_id)
+
+    def _on_note_deleted(self, note_id: str) -> None:
+        """노트가 삭제되면 편집 중이던 노트를 비우고 상태를 갱신한다."""
+        if self._current_note_id() == note_id:
+            self._editor.load_note(None)
+            self._suggestions.clear()
         self._refresh_status()
 
     def _on_quick_saved(self, note_id: str) -> None:
