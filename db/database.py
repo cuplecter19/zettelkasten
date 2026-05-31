@@ -32,6 +32,10 @@ SYNC_COLUMNS: list[tuple[str, str, str]] = [
 # 전체 스키마 정의(노트/FTS5/트리거/태그/링크/PDF/분류 캐시).
 SCHEMA_STATEMENTS: list[str] = [
     """
+    DROP TRIGGER IF EXISTS notes_ai;
+    DROP TRIGGER IF EXISTS notes_au;
+    DROP TRIGGER IF EXISTS notes_ad;
+
     CREATE TABLE IF NOT EXISTS notes (
         id          TEXT PRIMARY KEY,
         title       TEXT NOT NULL DEFAULT '제목 없음',
@@ -57,13 +61,17 @@ SCHEMA_STATEMENTS: list[str] = [
     """,
     """
     CREATE TRIGGER IF NOT EXISTS notes_au AFTER UPDATE ON notes BEGIN
-        UPDATE notes_fts SET title=new.title, body=new.body WHERE rowid=old.rowid;
-    END
+        INSERT INTO notes_fts(notes_fts, rowid, title, body)
+        VALUES('delete', old.rowid, old.title, old.body);
+        INSERT INTO notes_fts(rowid, title, body)
+        VALUES (new.rowid, new.title, new.body);
+    END;
     """,
     """
     CREATE TRIGGER IF NOT EXISTS notes_ad AFTER DELETE ON notes BEGIN
-        DELETE FROM notes_fts WHERE rowid=old.rowid;
-    END
+        INSERT INTO notes_fts(notes_fts, rowid, title, body)
+        VALUES('delete', old.rowid, old.title, old.body);
+    END;
     """,
     """
     CREATE TABLE IF NOT EXISTS tags (
