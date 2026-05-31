@@ -1,0 +1,77 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "앱 실행 (핫 리로드)",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["dev_runner.py"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "echo": true,
+        "reveal": "always",
+        "panel": "dedicated",
+        "label": "dev_runner",
+        "clear": true
+      },
+      "isBackground": true,
+      "problemMatcher": []
+    },
+    {
+      "label": "앱 실행 (단독, 리로드 없음)",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["main.py"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": "build",
+      "presentation": {
+        "panel": "dedicated",
+        "label": "main",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "테스트 실행 (전체)",
+      "type": "shell",
+      "command": "${command:python.interpreterPath}",
+      "args": ["-m", "pytest", "tests/", "-v", "--tb=short"],
+      "options": {
+        "cwd": "${workspaceFolder}"
+      },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
+      "presentation": {
+        "panel": "dedicated",
+        "label": "pytest",
+        "clear": true
+      },
+      "problemMatcher": []
+    },
+    {
+      "label": "Qt Designer 열기",
+      "type": "shell",
+      "command": "pyside6-designer",
+      "options": {
+        "cwd": "${workspaceFolder}/ui"
+      },
+      "group": "build",
+      "presentation": {
+        "panel": "dedicated",
+        "label": "designer",
+        "reveal": "silent"
+      },
+      "problemMatcher": []
+    }
+  ]
+}

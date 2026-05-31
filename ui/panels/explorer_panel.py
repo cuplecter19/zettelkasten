@@ -94,3 +94,13 @@ class ExplorerPanel(QWidget):
         note_id = item.data(256)
         if note_id:
             self.note_selected.emit(note_id)
+
+
+if __name__ == "__main__":
+    from PySide6.QtWidgets import QApplication
+    import sys
+    app = QApplication(sys.argv)
+    widget = ExplorerPanel()
+    widget.resize(400, 700)
+    widget.show()
+    sys.exit(app.exec())

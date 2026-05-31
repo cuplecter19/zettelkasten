@@ -88,3 +88,13 @@ class GraphPanel(QWidget):
             label = self._scene.addText(data.get("label", ""))
             label.setDefaultTextColor(QColor("#dddddd"))
             label.setPos(cx + _NODE_R, cy - _NODE_R)
+
+
+if __name__ == "__main__":
+    from PySide6.QtWidgets import QApplication
+    import sys
+    app = QApplication(sys.argv)
+    widget = GraphPanel()
+    widget.resize(900, 700)
+    widget.show()
+    sys.exit(app.exec())

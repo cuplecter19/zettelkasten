@@ -156,3 +156,13 @@ class EditorPanel(QWidget):
         if tag is not None:
             self._tag_repo.remove_tag_from_note(self._current_id, tag.id)
         self._refresh_tags()
+
+
+if __name__ == "__main__":
+    from PySide6.QtWidgets import QApplication
+    import sys
+    app = QApplication(sys.argv)
+    widget = EditorPanel()
+    widget.resize(800, 600)
+    widget.show()
+    sys.exit(app.exec())

@@ -8,3 +8,6 @@ networkx>=3.3
 keyboard>=0.13
 pytest>=8.0
 pytest-qt>=4.4
+
+# 개발 전용 (프로덕션 제외)
+watchdog>=4.0
