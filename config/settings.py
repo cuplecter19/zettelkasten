@@ -1,8 +1,12 @@
 """애플리케이션 전역 설정값."""
 
 from pathlib import Path
+import os
 
-APP_DIR              = Path.home() / ".zettelkasten"
+if os.name == 'nt':  # Windows
+    APP_DIR = Path(os.environ['LOCALAPPDATA']) / "Zettelkasten"
+else:
+    APP_DIR = Path.home() / ".zettelkasten"
 DB_PATH              = APP_DIR / "notes.db"
 PDF_DIR              = APP_DIR / "pdfs"
 THEME                = "dark"        # "dark" | "light"
@@ -10,9 +14,6 @@ FONT_SIZE            = 14            # pt
 QUICK_CAPTURE_HOTKEY = "ctrl+shift+n"
 CLUSTER_MIN_NOTES    = 50
 
-# ----- 동기화 설정(오라클 클라우드 동기화 서버) ---------------------------
-# 배포 후 실제 값으로 교체한다. 민감한 값은 환경변수로 덮어쓸 수 있다.
-import os
 
 SYNC_SERVER_URL  = os.environ.get("ZK_SYNC_SERVER_URL", "http://<서버IP>:8000")
 DEVICE_ID        = os.environ.get("ZK_DEVICE_ID", "main-pc")  # 기기별 고유 값
