@@ -121,6 +121,14 @@ def _enable_sqlite_fks(dbapi_connection, _connection_record) -> None:
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
 
+def _enable_sqlite_pragmas(dbapi_conn, _):
+    """SQLite 안정성 및 동시성 개선용 PRAGMA 설정."""
+    cursor = dbapi_conn.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.close()
+
 
 def ensure_sync_columns(conn: Connection) -> None:
     """동기화 전용 컬럼이 없으면 ALTER 로 추가한다(가드된 마이그레이션).
@@ -153,6 +161,7 @@ def init_db(db_path: Path | str = DB_PATH) -> Engine:
 
     _engine = create_engine(f"sqlite:///{db_path}", future=True)
     event.listen(_engine, "connect", _enable_sqlite_fks)
+    event.listen(_engine, "connect", _enable_sqlite_pragmas)
     _SessionFactory = sessionmaker(bind=_engine, expire_on_commit=False,
                                    future=True)
 
