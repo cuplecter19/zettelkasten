@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (QGraphicsEllipseItem, QGraphicsScene,
 from config.categories import NOTE_TYPE_COLORS
 from db.repositories.note_repo import NoteRepository
 from db.repositories.tag_repo import TagRepository
+from services.theme_service import get_theme_service
 
 logger = logging.getLogger(__name__)
 
@@ -79,6 +80,7 @@ class GraphPanel(QWidget):
         self.setAttribute(Qt.WA_StyledBackground, True)
         self._notes = NoteRepository()
         self._tags = TagRepository()
+        self._theme = get_theme_service()
 
         layout = QVBoxLayout(self)
         refresh_btn = QPushButton("그래프 새로고침")
@@ -91,6 +93,13 @@ class GraphPanel(QWidget):
         self._view.setToolTip("Ctrl + 마우스 휠로 확대/축소")
         layout.addWidget(self._view, 1)
 
+        self._theme.theme_changed.connect(self._apply_theme_colors)
+        self._apply_theme_colors()
+        self.refresh()
+
+    def _apply_theme_colors(self) -> None:
+        self._scene.setBackgroundBrush(
+            QBrush(QColor(self._theme.get_color("editor"))))
         self.refresh()
 
     def _build_graph(self) -> nx.Graph:
@@ -107,8 +116,10 @@ class GraphPanel(QWidget):
     def refresh(self) -> None:
         self._scene.clear()
         graph = self._build_graph()
+        text_color = QColor(self._theme.get_color("text"))
         if graph.number_of_nodes() == 0:
-            self._scene.addText("표시할 노트가 없습니다.")
+            label = self._scene.addText("표시할 노트가 없습니다.")
+            label.setDefaultTextColor(text_color)
             return
 
         positions = nx.spring_layout(graph, seed=42)
@@ -136,7 +147,7 @@ class GraphPanel(QWidget):
             self._scene.addItem(ellipse)
 
             label = self._scene.addText(data.get("label", ""))
-            label.setDefaultTextColor(QColor("#dddddd"))
+            label.setDefaultTextColor(text_color)
             label.setPos(cx + _NODE_R, cy - _NODE_R)
 
 

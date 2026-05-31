@@ -72,12 +72,13 @@ QMainWindow > QWidget, QDialog > QWidget, QDialog#SettingsDialog,
 QDialog#SettingsDialog QWidget#SettingsPage,
 QDialog#SettingsDialog QListWidget#SettingsCategoryList,
 QDialog#SettingsDialog QStackedWidget#SettingsStack,
-QMessageBox QLabel, QDockWidget > QWidget {{
+QMessageBox QLabel, QDockWidget > QWidget, QDockWidget QWidget {{
     background-color: {bg}; color: {text};
 }}
-QWidget {{ background-color: transparent; color: {text}; }}
+QWidget {{ background-color: {bg}; color: {text}; }}
 QWidget#PDFPanel, QWidget#GraphPanel,
-QMessageBox QWidget, QMessageBox QDialogButtonBox {{
+QMessageBox QWidget, QMessageBox QLabel, QMessageBox QFrame,
+QMessageBox QDialogButtonBox {{
     background-color: {bg}; color: {text};
 }}
 QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget,
@@ -116,6 +117,7 @@ QComboBox QAbstractItemView {{
     selection-background-color: {accent}; selection-color: {white};
 }}
 QListWidget {{ outline: none; }}
+QListWidget::viewport {{ background-color: {editor}; }}
 QListWidget::item {{ border-radius: 8px; }}
 QListWidget::item:selected {{ background-color: transparent; color: {text}; }}
 QGroupBox {{ border: none; border-radius: 8px; margin-top: 8px;
