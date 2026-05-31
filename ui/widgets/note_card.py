@@ -7,6 +7,7 @@ from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QVBoxLayout
 
 from config.categories import NOTE_TYPE_COLORS
 from core.note import Note
+from services.theme_service import get_theme_service
 
 
 class NoteCard(QFrame):
@@ -17,7 +18,8 @@ class NoteCard(QFrame):
         self.note_id = note.id
         self.setObjectName("NoteCard")
 
-        color = note.color_hint or NOTE_TYPE_COLORS.get(note.note_type, "#777777")
+        color = note.color_hint or get_theme_service().get_card_color(
+            note.note_type) or NOTE_TYPE_COLORS.get(note.note_type, "#777777")
         self.setStyleSheet(
             "#NoteCard { border-left: 5px solid %s; border-radius: 4px;"
             " background-color: rgba(255,255,255,0.04); }" % color
