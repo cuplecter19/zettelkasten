@@ -21,6 +21,8 @@ class PDFPanel(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("PDFPanel")
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self._repo = PdfRepository()
         self._service = PDFService()
         self._current_note_id: str | None = None

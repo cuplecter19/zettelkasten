@@ -75,6 +75,8 @@ class GraphPanel(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("GraphPanel")
+        self.setAttribute(Qt.WA_StyledBackground, True)
         self._notes = NoteRepository()
         self._tags = TagRepository()
 
