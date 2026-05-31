@@ -21,13 +21,15 @@ logger = logging.getLogger(__name__)
 
 THEME_PATH = APP_DIR / "theme.json"
 
-# 커스터마이징 가능한 UI 요소의 기본 색상(다크 테마).
+# 커스터마이징 가능한 UI 요소의 기본 색상(라이트 테마).
+# 첨부된 기본 UI 시안과 동일한 밝은 블루-그레이 팔레트를 사용한다. 사용자가
+# 설정의 디자인 탭에서 색상을 지정하면 그 값이 이 기본값보다 우선한다.
 DEFAULT_THEME: dict[str, str] = {
-    "background":   "#1e1e1e",
-    "sidebar":      "#252525",
-    "editor":       "#2a2a2a",
-    "text":         "#e0e0e0",
-    "accent":       "#4A90D9",
+    "background":   "#eef1f6",
+    "sidebar":      "#e3e7ef",
+    "editor":       "#dfe3ec",
+    "text":         "#2b2f36",
+    "accent":       "#5b7aa8",
     "card_LEARNING": NOTE_TYPE_COLORS["LEARNING"],
     "card_IDEA":     NOTE_TYPE_COLORS["IDEA"],
     "card_MOOD":     NOTE_TYPE_COLORS["MOOD"],
@@ -49,29 +51,49 @@ THEME_LABELS: dict[str, str] = {
 
 
 def build_stylesheet(colors: dict[str, str]) -> str:
-    """색상 딕셔너리로부터 전역 QSS 문자열을 생성한다."""
+    """색상 딕셔너리로부터 전역 QSS 문자열을 생성한다.
+
+    드롭다운(``QMenu``)과 설정 창(``QDialog``)을 포함한 모든 위젯이 동일한 컬러
+    팔레트를 공유하도록 구성한다.
+    """
     bg = colors.get("background", DEFAULT_THEME["background"])
     sidebar = colors.get("sidebar", DEFAULT_THEME["sidebar"])
     editor = colors.get("editor", DEFAULT_THEME["editor"])
     text = colors.get("text", DEFAULT_THEME["text"])
     accent = colors.get("accent", DEFAULT_THEME["accent"])
+    # 라이트/다크 양쪽에서 무난하게 보이는 반투명 경계선.
+    border = "rgba(128, 128, 128, 0.45)"
     return f"""
-QMainWindow, QWidget {{ background-color: {bg}; color: {text}; }}
+QMainWindow, QDialog, QWidget {{ background-color: {bg}; color: {text}; }}
 QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget {{
-    background-color: {editor}; color: {text}; border: 1px solid #3a3a3a;
-    border-radius: 4px;
+    background-color: {editor}; color: {text}; border: 1px solid {border};
+    border-radius: 6px; padding: 2px;
 }}
 QPushButton {{
-    background-color: {sidebar}; color: {text}; border: 1px solid #444444;
-    border-radius: 4px; padding: 4px 10px;
+    background-color: {sidebar}; color: {text}; border: 1px solid {border};
+    border-radius: 6px; padding: 4px 10px;
 }}
-QPushButton:hover {{ background-color: {accent}; }}
+QPushButton:hover {{ background-color: {accent}; color: white; }}
 QPushButton:checked {{ background-color: {accent}; color: white; }}
-QToolBar {{ background-color: {sidebar}; border: none; spacing: 6px; }}
+QToolBar {{ background-color: {sidebar}; border: none; spacing: 6px; padding: 4px; }}
 QStatusBar {{ background-color: {sidebar}; }}
-QMenuBar, QMenu {{ background-color: {sidebar}; color: {text}; }}
-QMenu::item:selected {{ background-color: {accent}; }}
+QMenuBar {{ background-color: {sidebar}; color: {text}; }}
+QMenuBar::item {{ background: transparent; padding: 4px 8px; }}
+QMenuBar::item:selected {{ background-color: {accent}; color: white; border-radius: 4px; }}
+QMenu {{ background-color: {sidebar}; color: {text}; border: 1px solid {border}; }}
+QMenu::item:selected {{ background-color: {accent}; color: white; }}
+QComboBox, QSpinBox {{
+    background-color: {editor}; color: {text}; border: 1px solid {border};
+    border-radius: 6px; padding: 2px 4px;
+}}
+QComboBox QAbstractItemView {{
+    background-color: {sidebar}; color: {text};
+    selection-background-color: {accent}; selection-color: white;
+}}
 QListWidget::item:selected {{ background-color: {accent}; color: white; }}
+QGroupBox {{ border: 1px solid {border}; border-radius: 6px; margin-top: 8px; }}
+QGroupBox::title {{ subcontrol-origin: margin; left: 8px; padding: 0 4px; }}
+#CustomTitleBar {{ background-color: {sidebar}; }}
 """
 
 

@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from db.repositories.note_repo import NoteRepository
 from services.dashboard_service import DashboardService
+from services.panel_service import PanelService
 from ui.dialogs.settings_dashboard_tab import SettingsDashboardTab
 
 
@@ -28,3 +29,12 @@ def test_refresh_picks_up_new_notes(qtbot, db):
     repo.create("c", "", "IDEA")
     tab.refresh()
     assert tab._values["total_notes"].text() == "1"
+
+
+def test_panel_mode_hides_disabled_panel(qtbot, db, tmp_path):
+    panels = PanelService(tmp_path / "panels.json")
+    tab = SettingsDashboardTab(DashboardService(), panels=panels)
+    qtbot.addWidget(tab)
+    assert tab._panel_widgets["by_type"].isVisibleTo(tab) is True
+    panels.set_enabled("by_type", False)
+    assert tab._panel_widgets["by_type"].isVisibleTo(tab) is False

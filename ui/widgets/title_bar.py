@@ -21,10 +21,21 @@ EDGE_MARGIN = 6
 class CustomTitleBar(QWidget):
     """창 상단에 위치하는 커스텀 타이틀바.
 
-    좌측에는 (선택적으로) 메뉴바를 배치하고, 우측에는 최소화/최대화/닫기
-    버튼을 둔다. 빈 영역을 드래그하면 창을 이동하고, 더블클릭하면 최대화를
-    토글한다.
+    좌측 상단에는 macOS 스타일의 컬러 도트 3종을 두며, 각 도트는 창 제어
+    버튼에 대응한다.
+
+    - 빨강 도트 → 종료(닫기)
+    - 주황 도트 → 최소화
+    - 초록 도트 → 최대화(토글)
+
+    그 우측으로 (선택적) 메뉴바와 제목을 배치한다. 빈 영역을 드래그하면 창을
+    이동하고, 더블클릭하면 최대화를 토글한다.
     """
+
+    # 도트 색상(테마와 무관하게 고정되는 기본 UI 색상).
+    DOT_CLOSE = "#ff5f57"     # 빨강 · 종료
+    DOT_MINIMIZE = "#ffab2e"  # 주황 · 최소화
+    DOT_MAXIMIZE = "#28c840"  # 초록 · 최대화
 
     def __init__(self, window: QWidget, title: str = "Zettelkasten",
                  menu_widget: QWidget | None = None) -> None:
@@ -35,8 +46,24 @@ class CustomTitleBar(QWidget):
         self.setFixedHeight(36)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(8, 0, 0, 0)
-        layout.setSpacing(4)
+        layout.setContentsMargins(12, 0, 8, 0)
+        layout.setSpacing(8)
+
+        # 좌측 상단 컬러 도트 3종(닫기/최소화/최대화).
+        self._btn_close = self._make_dot(self.DOT_CLOSE, "종료")
+        self._btn_close.setObjectName("TitleBarClose")
+        self._btn_close.clicked.connect(self._window.close)
+        layout.addWidget(self._btn_close)
+
+        self._btn_min = self._make_dot(self.DOT_MINIMIZE, "최소화")
+        self._btn_min.clicked.connect(self._window.showMinimized)
+        layout.addWidget(self._btn_min)
+
+        self._btn_max = self._make_dot(self.DOT_MAXIMIZE, "최대화")
+        self._btn_max.clicked.connect(self.toggle_maximize)
+        layout.addWidget(self._btn_max)
+
+        layout.addSpacing(8)
 
         if menu_widget is not None:
             layout.addWidget(menu_widget)
@@ -46,26 +73,20 @@ class CustomTitleBar(QWidget):
         layout.addWidget(self._title_label)
         layout.addStretch(1)
 
-        self._btn_min = self._make_button("\u2013", "최소화")    # en dash
-        self._btn_min.clicked.connect(self._window.showMinimized)
-        layout.addWidget(self._btn_min)
-
-        self._btn_max = self._make_button("\u25a1", "최대화")    # white square
-        self._btn_max.clicked.connect(self.toggle_maximize)
-        layout.addWidget(self._btn_max)
-
-        self._btn_close = self._make_button("\u2715", "닫기")    # multiplication x
-        self._btn_close.setObjectName("TitleBarClose")
-        self._btn_close.clicked.connect(self._window.close)
-        layout.addWidget(self._btn_close)
-
     # ----- 구성 -----------------------------------------------------------
-    def _make_button(self, text: str, tooltip: str) -> QPushButton:
-        btn = QPushButton(text, self)
+    def _make_dot(self, color: str, tooltip: str) -> QPushButton:
+        """지정한 색상의 원형 창 제어 도트 버튼을 만든다."""
+        btn = QPushButton("", self)
         btn.setToolTip(tooltip)
-        btn.setFixedSize(40, 36)
-        btn.setFlat(True)
+        btn.setFixedSize(14, 14)
         btn.setFocusPolicy(Qt.NoFocus)
+        btn.setCursor(Qt.PointingHandCursor)
+        # 전역 QSS(QPushButton)의 영향을 받지 않도록 인라인 스타일로 색을 고정.
+        btn.setStyleSheet(
+            f"QPushButton {{ background-color: {color}; border: none;"
+            " border-radius: 7px; }"
+            f"QPushButton:hover {{ background-color: {color};"
+            " border: 1px solid rgba(0, 0, 0, 0.35); }")
         return btn
 
     def set_title(self, title: str) -> None:
@@ -75,10 +96,8 @@ class CustomTitleBar(QWidget):
     def toggle_maximize(self) -> None:
         if self._window.isMaximized():
             self._window.showNormal()
-            self._btn_max.setText("\u25a1")
         else:
             self._window.showMaximized()
-            self._btn_max.setText("\u2750")  # 복원 아이콘
 
     # ----- 창 드래그 이동 -------------------------------------------------
     def mousePressEvent(self, event) -> None:  # noqa: N802 (Qt naming)
