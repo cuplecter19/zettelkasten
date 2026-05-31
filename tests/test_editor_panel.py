@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from db.repositories.note_repo import NoteRepository
+from services.css_snippet_service import CssSnippetService
+from services.markdown_style_service import MarkdownStyleService
 from ui.panels.editor_panel import EditorPanel
 
 
@@ -43,3 +45,23 @@ def test_loading_note_resets_markdown_toggle(qtbot, db):
 
     panel.load_note(note)  # 다시 로드하면 편집 모드로 복귀.
     assert panel._md_toggle.isChecked() is False
+
+
+def test_preview_applies_markdown_and_snippet_css(qtbot, db, tmp_path):
+    """Phase 4/5: 미리보기 HTML 에 서식·스니펫 CSS 가 합쳐져 들어간다."""
+    note = NoteRepository().create("제목", "# 머리말", "IDEA")
+    panel = EditorPanel()
+    qtbot.addWidget(panel)
+    panel.load_note(note)
+
+    # 전역 싱글턴을 건드리지 않도록 임시 경로 서비스로 교체.
+    panel._css_snippets = CssSnippetService(tmp_path / "css_snippets.json")
+    panel._md_style = MarkdownStyleService(tmp_path / "markdown_style.json")
+    panel._css_snippets.add_snippet("강조", ".md-h1 { letter-spacing: 2px; }")
+
+    panel._md_toggle.setChecked(True)
+    html = panel._preview.toHtml()
+    css = panel._markdown_css()
+    assert ".md-h1" in css
+    assert "letter-spacing: 2px;" in css
+    assert "머리말" in html

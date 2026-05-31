@@ -15,7 +15,9 @@ from db.repositories.note_repo import NoteRepository
 from db.repositories.tag_repo import TagRepository
 from services.attachment_service import AttachmentService
 from services.classifier import NoteClassifier
-from services.markdown_service import render_markdown
+from services.css_snippet_service import get_css_snippet_service
+from services.markdown_service import render_document
+from services.markdown_style_service import get_markdown_style_service
 from ui.widgets.tag_chip import TagChip
 
 logger = logging.getLogger(__name__)
@@ -55,6 +57,8 @@ class EditorPanel(QWidget):
         self._tag_repo = TagRepository()
         self._classifier = NoteClassifier()
         self._attachments = AttachmentService()
+        self._md_style = get_markdown_style_service()
+        self._css_snippets = get_css_snippet_service()
         self._current_id: str | None = None
         self._suggested_type: str | None = None
         self._workers: list[_ThumbnailWorker] = []
@@ -102,6 +106,10 @@ class EditorPanel(QWidget):
         self._preview.setOpenExternalLinks(True)
         self._preview.setVisible(False)
         layout.addWidget(self._preview, 1)
+
+        # Phase 4/5 서식·스니펫이 바뀌면 미리보기가 켜져 있을 때 즉시 갱신.
+        self._md_style.style_changed.connect(self._refresh_preview)
+        self._css_snippets.snippets_changed.connect(self._refresh_preview)
 
         # PDF 등 첨부 카드 영역.
         self._attach_container = QWidget(self)
@@ -251,9 +259,22 @@ class EditorPanel(QWidget):
             QMessageBox.warning(self, "오류", "첨부 파일을 열 수 없습니다.")
 
     # ----- 마크다운 보기 -------------------------------------------------
+    def _markdown_css(self) -> str:
+        """Phase 4 서식 CSS 와 Phase 5 활성 스니펫 CSS 를 합친다."""
+        return f"{self._md_style.build_css()}\n{self._css_snippets.build_css()}"
+
+    def _render_preview(self) -> None:
+        self._preview.setHtml(
+            render_document(self._body.toPlainText(), self._markdown_css()))
+
+    def _refresh_preview(self) -> None:
+        """미리보기가 표시 중일 때만 다시 렌더링한다."""
+        if self._preview.isVisible():
+            self._render_preview()
+
     def _on_markdown_toggled(self, checked: bool) -> None:
         if checked:
-            self._preview.setHtml(render_markdown(self._body.toPlainText()))
+            self._render_preview()
             self._body.setVisible(False)
             self._preview.setVisible(True)
         else:
