@@ -5,7 +5,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime
 
-from sqlalchemy import Boolean, DateTime, String, Text, func
+from sqlalchemy import Boolean, DateTime, Integer, String, Text, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from db.base import Base
@@ -28,6 +28,8 @@ class Note(Base):
     updated_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     is_pinned: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     color_hint: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 수동 정렬 순서(드래그 앤 드롭). 값이 작을수록 위에 표시된다.
+    sort_order: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
     # 동기화 메타데이터.
     last_synced_by: Mapped[str | None] = mapped_column(String, nullable=True)
     deleted_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

@@ -17,6 +17,7 @@ from db.repositories.note_repo import NoteRepository
 from config import settings
 from services.export_service import ExportService
 from services.linker import LinkerService
+from services.layout_service import LayoutService
 from services.sync_service import SyncService
 from services.theme_service import get_theme_service
 from ui.dialogs.settings_dialog import SettingsDialog
@@ -39,6 +40,7 @@ class MainWindow(QMainWindow):
         self._linker = LinkerService()
         self._export = ExportService()
         self._theme = get_theme_service()
+        self._layout = LayoutService()
 
         self.setWindowTitle("Zettelkasten")
         self.resize(1100, 720)
@@ -90,14 +92,18 @@ class MainWindow(QMainWindow):
 
     def _build_central(self) -> None:
         splitter = QSplitter(Qt.Horizontal, self)
+        self._central_splitter = splitter
 
         self._explorer = ExplorerPanel(self)
         self._explorer.note_selected.connect(self._on_note_selected)
+        self._explorer.note_deleted.connect(self._on_note_deleted)
         splitter.addWidget(self._explorer)
 
         right = QSplitter(Qt.Vertical, self)
+        self._right_splitter = right
         self._editor = EditorPanel(self)
         self._editor.note_saved.connect(self._on_note_saved)
+        self._editor.attachment_added.connect(self._on_attachment_added)
         right.addWidget(self._editor)
 
         # 연결 노트 제안 영역.
@@ -117,6 +123,23 @@ class MainWindow(QMainWindow):
         splitter.setStretchFactor(1, 2)
 
         self.setCentralWidget(splitter)
+
+        # 저장된 패널 너비를 복원하고, 이동 시 저장한다.
+        self._restore_splitter_sizes()
+        splitter.splitterMoved.connect(
+            lambda *_: self._layout.set_sizes(
+                "central_splitter", splitter.sizes()))
+        right.splitterMoved.connect(
+            lambda *_: self._layout.set_sizes(
+                "right_splitter", right.sizes()))
+
+    def _restore_splitter_sizes(self) -> None:
+        central = self._layout.get_sizes("central_splitter")
+        if central:
+            self._central_splitter.setSizes(central)
+        right = self._layout.get_sizes("right_splitter")
+        if right:
+            self._right_splitter.setSizes(right)
 
     def _build_menu(self) -> None:
         menubar = QMenuBar(self)
@@ -281,6 +304,18 @@ class MainWindow(QMainWindow):
     def _on_note_saved(self, note_id: str) -> None:
         self._explorer.refresh()
         self._explorer.select_note(note_id)
+        self._refresh_status()
+
+    def _on_attachment_added(self, note_id: str) -> None:
+        """첨부/썸네일 변경 시 리스트 카드 미디어를 갱신한다."""
+        self._explorer.refresh()
+        self._explorer.select_note(note_id)
+
+    def _on_note_deleted(self, note_id: str) -> None:
+        """노트가 삭제되면 편집 중이던 노트를 비우고 상태를 갱신한다."""
+        if self._current_note_id() == note_id:
+            self._editor.load_note(None)
+            self._suggestions.clear()
         self._refresh_status()
 
     def _on_quick_saved(self, note_id: str) -> None:

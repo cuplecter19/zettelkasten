@@ -1,38 +1,77 @@
-"""Editor panel: title, body, auto-save, type suggestion banner and tags."""
+"""Editor panel: title, body, auto-save, attachments and markdown preview."""
 
 from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QEvent, Qt, Signal
-from PySide6.QtWidgets import (QFrame, QHBoxLayout, QLabel, QLineEdit,
-                               QMessageBox, QPushButton, QTextEdit, QVBoxLayout,
-                               QWidget)
+from PySide6.QtCore import QEvent, Qt, QThread, Signal
+from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QLabel,
+                               QLineEdit, QMessageBox, QPushButton, QTextBrowser,
+                               QTextEdit, QToolButton, QVBoxLayout, QWidget)
 
 from config.categories import NOTE_TYPE_COLORS
 from core.note import Note
 from db.repositories.note_repo import NoteRepository
 from db.repositories.tag_repo import TagRepository
+from services.attachment_service import AttachmentService
 from services.classifier import NoteClassifier
+from services.markdown_service import render_markdown
 from ui.widgets.tag_chip import TagChip
 
 logger = logging.getLogger(__name__)
+
+_IMAGE_PDF_FILTER = (
+    "첨부 파일 (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.pdf);;모든 파일 (*)")
+
+
+class _ThumbnailWorker(QThread):
+    """첨부 썸네일을 백그라운드에서 생성하는 워커."""
+
+    done = Signal(str)  # attachment_id
+
+    def __init__(self, service: AttachmentService, attachment_id: str,
+                 parent=None) -> None:
+        super().__init__(parent)
+        self._service = service
+        self._attachment_id = attachment_id
+
+    def run(self) -> None:  # noqa: D401 - QThread entry point
+        try:
+            self._service.generate_thumbnail(self._attachment_id)
+        except Exception:
+            logger.exception("썸네일 워커 실패")
+        self.done.emit(self._attachment_id)
 
 
 class EditorPanel(QWidget):
     """포커스 이탈 시 자동 저장되는 노트 편집 패널."""
 
     note_saved = Signal(str)
+    attachment_added = Signal(str)  # note_id
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
         self._repo = NoteRepository()
         self._tag_repo = TagRepository()
         self._classifier = NoteClassifier()
+        self._attachments = AttachmentService()
         self._current_id: str | None = None
         self._suggested_type: str | None = None
+        self._workers: list[_ThumbnailWorker] = []
 
         layout = QVBoxLayout(self)
+
+        # 상단 툴바: 파일 첨부 / 마크다운 보기 토글.
+        toolbar = QHBoxLayout()
+        self._attach_btn = QPushButton("파일 첨부", self)
+        self._attach_btn.clicked.connect(self._attach_file)
+        toolbar.addWidget(self._attach_btn)
+        self._md_toggle = QPushButton("마크다운 보기", self)
+        self._md_toggle.setCheckable(True)
+        self._md_toggle.toggled.connect(self._on_markdown_toggled)
+        toolbar.addWidget(self._md_toggle)
+        toolbar.addStretch(1)
+        layout.addLayout(toolbar)
 
         self._title = QLineEdit(self)
         self._title.setPlaceholderText("제목")
@@ -58,6 +97,18 @@ class EditorPanel(QWidget):
         self._body.setPlaceholderText("본문을 입력하세요. 포커스를 벗어나면 자동 저장됩니다.")
         layout.addWidget(self._body, 1)
 
+        # 마크다운 렌더링 미리보기(토글 시 표시).
+        self._preview = QTextBrowser(self)
+        self._preview.setOpenExternalLinks(True)
+        self._preview.setVisible(False)
+        layout.addWidget(self._preview, 1)
+
+        # PDF 등 첨부 카드 영역.
+        self._attach_container = QWidget(self)
+        self._attach_layout = QVBoxLayout(self._attach_container)
+        self._attach_layout.setContentsMargins(0, 0, 0, 0)
+        layout.addWidget(self._attach_container)
+
         # 태그 칩 영역.
         self._tags_container = QWidget(self)
         self._tags_layout = QHBoxLayout(self._tags_container)
@@ -74,14 +125,19 @@ class EditorPanel(QWidget):
     def load_note(self, note: Note | None) -> None:
         self._current_id = note.id if note else None
         self.setEnabled(note is not None)
+        # 노트를 바꾸면 마크다운 보기는 끈다(편집 우선).
+        if self._md_toggle.isChecked():
+            self._md_toggle.setChecked(False)
         if note is None:
             self._title.clear()
             self._body.clear()
             self._banner.setVisible(False)
+            self._clear_attachment_cards()
             return
         self._title.setText(note.title)
         self._body.setPlainText(note.body)
         self._refresh_tags()
+        self._refresh_attachments()
         self._update_suggestion_banner()
 
     def eventFilter(self, obj, event) -> bool:  # noqa: N802 (Qt naming)
@@ -103,6 +159,106 @@ class EditorPanel(QWidget):
         except Exception:
             logger.exception("Auto-save failed")
             QMessageBox.warning(self, "오류", "노트를 저장하지 못했습니다.")
+
+    # ----- 첨부 ----------------------------------------------------------
+    def _attach_file(self) -> None:
+        if self._current_id is None:
+            return
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "첨부할 파일 선택", "", _IMAGE_PDF_FILTER)
+        if not file_path:
+            return
+        try:
+            attachment = self._attachments.add_attachment(
+                self._current_id, file_path)
+        except Exception:
+            logger.exception("첨부 추가 실패")
+            QMessageBox.warning(self, "오류", "파일을 첨부하지 못했습니다.")
+            return
+
+        # 이미지는 본문에 마크다운 이미지 링크를 삽입한다.
+        if attachment.file_type == "image":
+            self._insert_image_markdown(attachment.file_path)
+            self._save()
+        # 썸네일을 백그라운드에서 생성.
+        self._start_thumbnail_worker(attachment.id)
+        self._refresh_attachments()
+        self.attachment_added.emit(self._current_id)
+
+    def _insert_image_markdown(self, path: str) -> None:
+        cursor = self._body.textCursor()
+        cursor.movePosition(cursor.MoveOperation.End)
+        prefix = "\n" if self._body.toPlainText().strip() else ""
+        cursor.insertText(f"{prefix}![]({path})\n")
+        self._body.setTextCursor(cursor)
+
+    def _start_thumbnail_worker(self, attachment_id: str) -> None:
+        worker = _ThumbnailWorker(self._attachments, attachment_id, self)
+        worker.done.connect(self._on_thumbnail_done)
+        worker.finished.connect(lambda w=worker: self._cleanup_worker(w))
+        self._workers.append(worker)
+        worker.start()
+
+    def _on_thumbnail_done(self, _attachment_id: str) -> None:
+        # 썸네일이 준비되면 첨부 카드/카드 미디어를 갱신한다.
+        self._refresh_attachments()
+        if self._current_id is not None:
+            self.attachment_added.emit(self._current_id)
+
+    def _cleanup_worker(self, worker: _ThumbnailWorker) -> None:
+        if worker in self._workers:
+            self._workers.remove(worker)
+
+    def _clear_attachment_cards(self) -> None:
+        while self._attach_layout.count():
+            item = self._attach_layout.takeAt(0)
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+
+    def _refresh_attachments(self) -> None:
+        """PDF/기타 첨부를 카드로 표시한다(이미지는 본문에 인라인)."""
+        self._clear_attachment_cards()
+        if self._current_id is None:
+            return
+        for att in self._attachments.list_for_note(self._current_id):
+            if att.file_type == "image":
+                continue
+            self._attach_layout.addWidget(self._build_attachment_card(att))
+
+    def _build_attachment_card(self, attachment) -> QFrame:
+        from pathlib import Path
+        card = QFrame(self)
+        card.setObjectName("AttachmentCard")
+        card.setStyleSheet(
+            "#AttachmentCard { border: 1px solid #444; border-radius: 4px; }")
+        row = QHBoxLayout(card)
+        row.setContentsMargins(8, 4, 8, 4)
+        label = QLabel(Path(attachment.file_path).name, card)
+        row.addWidget(label, 1)
+        open_btn = QToolButton(card)
+        open_btn.setText("열기")
+        open_btn.clicked.connect(
+            lambda _checked=False, aid=attachment.id: self._open_attachment(aid))
+        row.addWidget(open_btn)
+        return card
+
+    def _open_attachment(self, attachment_id: str) -> None:
+        try:
+            self._attachments.open_attachment(attachment_id)
+        except Exception:
+            logger.exception("첨부 열기 실패")
+            QMessageBox.warning(self, "오류", "첨부 파일을 열 수 없습니다.")
+
+    # ----- 마크다운 보기 -------------------------------------------------
+    def _on_markdown_toggled(self, checked: bool) -> None:
+        if checked:
+            self._preview.setHtml(render_markdown(self._body.toPlainText()))
+            self._body.setVisible(False)
+            self._preview.setVisible(True)
+        else:
+            self._body.setVisible(True)
+            self._preview.setVisible(False)
 
     # ----- 분류 제안 ------------------------------------------------------
     def _update_suggestion_banner(self) -> None:

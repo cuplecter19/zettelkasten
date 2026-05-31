@@ -29,6 +29,12 @@ SYNC_COLUMNS: list[tuple[str, str, str]] = [
     ("pdf_assets", "deleted_at", "DATETIME"),
 ]
 
+# 기능 추가에 따른 가드된 컬럼 마이그레이션(기존 DB 보호).
+# 각 항목: (테이블, 컬럼, 컬럼 정의). DEFAULT 를 지정해 기존 행도 안전하게 채운다.
+MIGRATION_COLUMNS: list[tuple[str, str, str]] = [
+    ("notes", "sort_order", "INTEGER NOT NULL DEFAULT 0"),
+]
+
 # 전체 스키마 정의(노트/FTS5/트리거/태그/링크/PDF/분류 캐시).
 SCHEMA_STATEMENTS: list[str] = [
     "DROP TRIGGER IF EXISTS notes_ai",
@@ -116,6 +122,21 @@ SCHEMA_STATEMENTS: list[str] = [
         updated_at     DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
     )
     """,
+    """
+    CREATE TABLE IF NOT EXISTS attachments (
+        id         TEXT PRIMARY KEY,
+        note_id    TEXT NOT NULL REFERENCES notes(id) ON DELETE CASCADE,
+        file_path  TEXT NOT NULL,
+        file_type  TEXT NOT NULL DEFAULT 'other'
+                   CHECK(file_type IN ('image','pdf','other')),
+        thumbnail  BLOB,
+        created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    )
+    """,
+    """
+    CREATE INDEX IF NOT EXISTS idx_attachments_note
+        ON attachments(note_id)
+    """,
 ]
 
 # 엔진/세션 팩토리는 init_db() 에서 초기화된다.
@@ -138,19 +159,28 @@ def _enable_sqlite_pragmas(dbapi_conn, _):
     cursor.close()
 
 
-def ensure_sync_columns(conn: Connection) -> None:
-    """동기화 전용 컬럼이 없으면 ALTER 로 추가한다(가드된 마이그레이션).
+def ensure_columns(conn: Connection,
+                   columns: list[tuple[str, str, str]]) -> None:
+    """주어진 (테이블, 컬럼, 정의) 목록의 컬럼이 없으면 ALTER 로 추가한다.
 
-    서버·로컬 양쪽에서 재사용한다. 이미 존재하는 DB 파일에도 안전하게 적용된다.
+    이미 존재하는 DB 파일에도 안전하게 적용되는 가드된 마이그레이션이다.
     """
-    for table, column, definition in SYNC_COLUMNS:
+    for table, column, definition in columns:
         existing = {
             row[1] for row in conn.execute(text(f"PRAGMA table_info({table})"))
         }
         if column not in existing:
             conn.execute(
                 text(f"ALTER TABLE {table} ADD COLUMN {column} {definition}"))
-            logger.info("Added sync column %s.%s", table, column)
+            logger.info("Added column %s.%s", table, column)
+
+
+def ensure_sync_columns(conn: Connection) -> None:
+    """동기화 전용 컬럼이 없으면 ALTER 로 추가한다(가드된 마이그레이션).
+
+    서버·로컬 양쪽에서 재사용한다. 이미 존재하는 DB 파일에도 안전하게 적용된다.
+    """
+    ensure_columns(conn, SYNC_COLUMNS)
 
 
 def init_db(db_path: Path | str = DB_PATH) -> Engine:
@@ -177,6 +207,7 @@ def init_db(db_path: Path | str = DB_PATH) -> Engine:
         for statement in SCHEMA_STATEMENTS:
             conn.execute(text(statement))
         ensure_sync_columns(conn)
+        ensure_columns(conn, MIGRATION_COLUMNS)
 
     logger.info("Database initialised at %s", db_path)
     return _engine
