@@ -30,6 +30,7 @@ DEFAULT_THEME: dict[str, str] = {
     "editor":       "#d9dde6",
     "text":         "#3a3f47",
     "accent":       "#7c8aa5",
+    "white":        "#ffffff",
     "card_LEARNING": NOTE_TYPE_COLORS["LEARNING"],
     "card_IDEA":     NOTE_TYPE_COLORS["IDEA"],
     "card_MOOD":     NOTE_TYPE_COLORS["MOOD"],
@@ -61,6 +62,7 @@ def build_stylesheet(colors: dict[str, str]) -> str:
     editor = colors.get("editor", DEFAULT_THEME["editor"])
     text = colors.get("text", DEFAULT_THEME["text"])
     accent = colors.get("accent", DEFAULT_THEME["accent"])
+    white = colors.get("white", DEFAULT_THEME["white"])
     # 외곽선을 없애고 둥근 모서리 위주의 파스텔 UI 를 구성한다.
     return f"""
 QMainWindow, QDialog {{ background-color: {bg}; color: {text}; }}
@@ -70,30 +72,30 @@ QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget {{
     border-radius: 12px; padding: 8px;
 }}
 QPushButton {{
-    background-color: {accent}; color: white; border: none;
+    background-color: {accent}; color: {white}; border: none;
     border-radius: 10px; padding: 6px 14px;
 }}
-QPushButton:hover {{ background-color: {text}; color: white; }}
-QPushButton:checked {{ background-color: {text}; color: white; }}
+QPushButton:hover {{ background-color: {text}; color: {white}; }}
+QPushButton:checked {{ background-color: {text}; color: {white}; }}
 QToolBar {{ background-color: transparent; border: none; spacing: 8px; padding: 6px; }}
 QStatusBar {{ background-color: transparent; border: none; }}
 QStatusBar::item {{ border: none; }}
 QMenuBar {{ background-color: transparent; color: {text}; }}
-QMenuBar::item {{ background: transparent; padding: 4px 8px; }}
-QMenuBar::item:selected {{ background-color: {accent}; color: white; border-radius: 6px; }}
+QMenuBar::item {{ background: transparent; padding: 6px 14px; }}
+QMenuBar::item:selected {{ background-color: {accent}; color: {white}; border-radius: 6px; }}
 QMenu {{ background-color: {sidebar}; color: {text}; border: none; border-radius: 8px; }}
-QMenu::item:selected {{ background-color: {accent}; color: white; }}
+QMenu::item:selected {{ background-color: {accent}; color: {white}; }}
 QComboBox, QSpinBox {{
     background-color: {editor}; color: {text}; border: none;
     border-radius: 8px; padding: 4px 8px;
 }}
 QComboBox QAbstractItemView {{
     background-color: {sidebar}; color: {text}; border: none;
-    selection-background-color: {accent}; selection-color: white;
+    selection-background-color: {accent}; selection-color: {white};
 }}
 QListWidget {{ outline: none; }}
 QListWidget::item {{ border-radius: 8px; }}
-QListWidget::item:selected {{ background-color: {accent}; color: white; }}
+QListWidget::item:selected {{ background-color: transparent; color: {text}; }}
 QGroupBox {{ border: none; border-radius: 8px; margin-top: 8px;
     background-color: {editor}; }}
 QGroupBox::title {{ subcontrol-origin: margin; left: 8px; padding: 0 4px; }}
@@ -102,7 +104,11 @@ QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
 QScrollBar::handle:vertical {{ background: {accent}; border-radius: 4px;
     min-height: 24px; }}
 QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
-#CustomTitleBar {{ background-color: {sidebar}; }}
+#CustomTitleBar {{
+    background: qlineargradient(x1:0, y1:0, x2:0, y2:1,
+        stop:0 #d8d8da, stop:1 #c6c6c8);
+}}
+#WindowHeader {{ background-color: {bg}; }}
 """
 
 

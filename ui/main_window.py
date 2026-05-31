@@ -10,8 +10,8 @@ from PySide6.QtGui import QAction, QKeySequence
 from PySide6.QtWidgets import (QDockWidget, QFileDialog, QLabel, QLineEdit,
                                QListWidget, QListWidgetItem, QMainWindow,
                                QMenuBar, QMessageBox, QPushButton, QSplitter,
-                               QStyle, QSystemTrayIcon, QToolBar, QVBoxLayout,
-                               QWidget)
+                               QSizePolicy, QStyle, QSystemTrayIcon, QToolBar,
+                               QVBoxLayout, QWidget)
 
 from db.repositories.note_repo import NoteRepository
 from config import settings
@@ -47,6 +47,7 @@ class MainWindow(QMainWindow):
 
         # 기본 제목 표시줄 제거(커스텀 타이틀바 사용).
         self.setWindowFlag(Qt.FramelessWindowHint, True)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
         self._apply_theme()
         self._theme.theme_changed.connect(self._apply_theme)
 
@@ -80,7 +81,10 @@ class MainWindow(QMainWindow):
         from PySide6.QtCore import QRectF
         from PySide6.QtGui import QPainterPath, QRegion
 
-        radius = 16
+        if self.isMaximized():
+            self.clearMask()
+            return
+        radius = 24
         path = QPainterPath()
         path.addRoundedRect(QRectF(self.rect()), radius, radius)
         region = QRegion(path.toFillPolygon().toPolygon())
@@ -93,8 +97,10 @@ class MainWindow(QMainWindow):
         self.addToolBar(toolbar)
 
         self._search = QLineEdit(self)
-        self._search.setPlaceholderText("검색…")
+        self._search.setPlaceholderText("검색")
         self._search.setClearButtonEnabled(True)
+        self._search.setMinimumWidth(520)
+        self._search.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Fixed)
         self._search.textChanged.connect(self._on_search)
         toolbar.addWidget(self._search)
 
@@ -187,10 +193,17 @@ class MainWindow(QMainWindow):
         self.addAction(act_settings)
 
     def _build_titlebar(self) -> None:
-        """메뉴바를 포함한 커스텀 타이틀바를 창 상단에 배치한다."""
-        self._title_bar = CustomTitleBar(
-            self, title="Zettelkasten", menu_widget=self._menubar)
-        self.setMenuWidget(self._title_bar)
+        """커스텀 타이틀바와 메뉴바를 위아래로 분리해 창 상단에 배치한다."""
+        header = QWidget(self)
+        header.setObjectName("WindowHeader")
+        header_layout = QVBoxLayout(header)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        header_layout.setSpacing(0)
+
+        self._title_bar = CustomTitleBar(self, title="")
+        header_layout.addWidget(self._title_bar)
+        header_layout.addWidget(self._menubar)
+        self.setMenuWidget(header)
 
     def _open_settings(self) -> None:
         dialog = SettingsDialog(self, theme=self._theme)
@@ -213,7 +226,9 @@ class MainWindow(QMainWindow):
         self._view_menu.addAction(graph_dock.toggleViewAction())
 
     def _build_statusbar(self) -> None:
+        self.statusBar().setContentsMargins(12, 0, 12, 0)
         self._status_label = QLabel("", self)
+        self._status_label.setContentsMargins(12, 0, 0, 0)
         self.statusBar().addWidget(self._status_label)
 
         # 동기화 상태 표시(이모지 미사용): 색상 점 + 텍스트.

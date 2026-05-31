@@ -56,6 +56,7 @@ class ExplorerPanel(QWidget):
 
         self._list = QListWidget(self)
         self._list.itemClicked.connect(self._on_item_clicked)
+        self._list.setSpacing(8)
         # 드래그 앤 드롭으로 순서 변경 활성화(내부 이동).
         self._list.setDragDropMode(QAbstractItemView.InternalMove)
         self._list.model().rowsMoved.connect(self._on_rows_moved)
@@ -69,7 +70,7 @@ class ExplorerPanel(QWidget):
         color = NOTE_TYPE_COLORS.get(label, "#aab1bd")
         return (
             "QPushButton {"
-            f" background-color: {color}; color: white; border: none;"
+            f" background-color: {color}; color: #ffffff; border: none;"
             " border-radius: 12px; padding: 5px 14px; font-weight: bold; }"
             "QPushButton:checked { border: 2px solid rgba(0,0,0,0.25); }"
         )
@@ -88,7 +89,7 @@ class ExplorerPanel(QWidget):
             card = NoteCard(note, thumbnail=thumbnail, has_pdf=has_pdf)
             card.delete_requested.connect(self._on_delete_requested)
             item = QListWidgetItem(self._list)
-            item.setSizeHint(QSize(0, max(card.sizeHint().height(), 56)))
+            item.setSizeHint(QSize(0, max(card.sizeHint().height(), 78)))
             item.setData(256, note.id)  # Qt.UserRole
             self._list.addItem(item)
             self._list.setItemWidget(item, card)

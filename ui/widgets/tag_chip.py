@@ -20,8 +20,8 @@ class TagChip(QFrame):
         bg = color or "#555555"
         self.setStyleSheet(
             f"#TagChip {{ background-color: {bg}; border-radius: 8px; }}"
-            "QLabel { color: white; padding: 2px 4px; }"
-            "QToolButton { color: white; border: none; }"
+            "QLabel { color: #ffffff; padding: 2px 4px; }"
+            "QToolButton { color: #ffffff; border: none; }"
         )
 
         layout = QHBoxLayout(self)

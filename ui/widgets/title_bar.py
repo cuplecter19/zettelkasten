@@ -43,10 +43,10 @@ class CustomTitleBar(QWidget):
         self._window = window
         self._drag_offset: QPoint | None = None
         self.setObjectName("CustomTitleBar")
-        self.setFixedHeight(36)
+        self.setFixedHeight(44)
 
         layout = QHBoxLayout(self)
-        layout.setContentsMargins(12, 0, 8, 0)
+        layout.setContentsMargins(24, 0, 8, 0)
         layout.setSpacing(8)
 
         # 좌측 상단 컬러 도트 3종(닫기/최소화/최대화).
