@@ -75,5 +75,8 @@ def test_build_stylesheet_paints_docked_panels_and_message_boxes():
     qss = build_stylesheet({"background": "#010203", "editor": "#111213"})
     assert "QDockWidget" in qss
     assert "QDockWidget::title" in qss
+    assert "QWidget#PDFPanel" in qss
+    assert "QWidget#GraphPanel" in qss
     assert "QMessageBox" in qss
+    assert "QMessageBox QWidget" in qss
     assert "QGraphicsView" in qss

@@ -76,6 +76,10 @@ QMessageBox QLabel, QDockWidget > QWidget {{
     background-color: {bg}; color: {text};
 }}
 QWidget {{ background-color: transparent; color: {text}; }}
+QWidget#PDFPanel, QWidget#GraphPanel,
+QMessageBox QWidget, QMessageBox QDialogButtonBox {{
+    background-color: {bg}; color: {text};
+}}
 QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget,
 QGraphicsView {{
     background-color: {editor}; color: {text}; border: none;
