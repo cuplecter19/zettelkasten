@@ -11,10 +11,10 @@ KEYWORD_RULES = {
     "ARCHIVE":  ["구매", "도안", "자수", "패턴", "파일", "저장", "보관"],
 }
 
-# 노트 유형별 시각 구분 색상(HEX).
+# 노트 유형별 시각 구분 색상(HEX). 첨부 시안과 동일한 파스텔 팔레트.
 NOTE_TYPE_COLORS = {
-    "LEARNING": "#4A90D9",
-    "IDEA":     "#F5A623",
-    "MOOD":     "#9B59B6",
-    "ARCHIVE":  "#27AE60",
+    "LEARNING": "#9DB8E3",
+    "IDEA":     "#F4B470",
+    "MOOD":     "#C9A6DC",
+    "ARCHIVE":  "#A7CF8E",
 }

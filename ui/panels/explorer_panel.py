@@ -4,11 +4,12 @@ from __future__ import annotations
 
 import logging
 
-from PySide6.QtCore import QSize, Signal
+from PySide6.QtCore import QSize, Qt, Signal
 from PySide6.QtWidgets import (QAbstractItemView, QButtonGroup, QHBoxLayout,
                                QListWidget, QListWidgetItem, QMessageBox,
                                QPushButton, QVBoxLayout, QWidget)
 
+from config.categories import NOTE_TYPE_COLORS
 from db.repositories.attachment_repo import AttachmentRepository
 from db.repositories.note_repo import NoteRepository
 from services.search_service import SearchService
@@ -36,18 +37,21 @@ class ExplorerPanel(QWidget):
 
         layout = QVBoxLayout(self)
 
-        # 유형별 필터 버튼.
+        # 유형별 필터 버튼(파스텔 알약 형태).
         filter_bar = QHBoxLayout()
         self._button_group = QButtonGroup(self)
         self._button_group.setExclusive(True)
         for label in _FILTERS:
             btn = QPushButton(label)
             btn.setCheckable(True)
+            btn.setCursor(Qt.PointingHandCursor)
+            btn.setStyleSheet(self._pill_style(label))
             if label == "전체":
                 btn.setChecked(True)
             btn.clicked.connect(lambda _checked, lbl=label: self._on_filter(lbl))
             self._button_group.addButton(btn)
             filter_bar.addWidget(btn)
+        filter_bar.addStretch(1)
         layout.addLayout(filter_bar)
 
         self._list = QListWidget(self)
@@ -60,6 +64,16 @@ class ExplorerPanel(QWidget):
         self.refresh()
 
     # ----- 외부 API -------------------------------------------------------
+    def _pill_style(self, label: str) -> str:
+        """필터 버튼을 유형 색상의 둥근 파스텔 알약으로 스타일링한다."""
+        color = NOTE_TYPE_COLORS.get(label, "#aab1bd")
+        return (
+            "QPushButton {"
+            f" background-color: {color}; color: white; border: none;"
+            " border-radius: 12px; padding: 5px 14px; font-weight: bold; }"
+            "QPushButton:checked { border: 2px solid rgba(0,0,0,0.25); }"
+        )
+
     def set_query(self, query: str) -> None:
         self._query = query or ""
         self.refresh()

@@ -25,11 +25,11 @@ THEME_PATH = APP_DIR / "theme.json"
 # 첨부된 기본 UI 시안과 동일한 밝은 블루-그레이 팔레트를 사용한다. 사용자가
 # 설정의 디자인 탭에서 색상을 지정하면 그 값이 이 기본값보다 우선한다.
 DEFAULT_THEME: dict[str, str] = {
-    "background":   "#eef1f6",
-    "sidebar":      "#e3e7ef",
-    "editor":       "#dfe3ec",
-    "text":         "#2b2f36",
-    "accent":       "#5b7aa8",
+    "background":   "#eef1f7",
+    "sidebar":      "#e2e6ef",
+    "editor":       "#d9dde6",
+    "text":         "#3a3f47",
+    "accent":       "#7c8aa5",
     "card_LEARNING": NOTE_TYPE_COLORS["LEARNING"],
     "card_IDEA":     NOTE_TYPE_COLORS["IDEA"],
     "card_MOOD":     NOTE_TYPE_COLORS["MOOD"],
@@ -61,38 +61,47 @@ def build_stylesheet(colors: dict[str, str]) -> str:
     editor = colors.get("editor", DEFAULT_THEME["editor"])
     text = colors.get("text", DEFAULT_THEME["text"])
     accent = colors.get("accent", DEFAULT_THEME["accent"])
-    # 라이트/다크 양쪽에서 무난하게 보이는 반투명 경계선.
-    border = "rgba(128, 128, 128, 0.45)"
+    # 외곽선을 없애고 둥근 모서리 위주의 파스텔 UI 를 구성한다.
     return f"""
-QMainWindow, QDialog, QWidget {{ background-color: {bg}; color: {text}; }}
+QMainWindow, QDialog {{ background-color: {bg}; color: {text}; }}
+QWidget {{ background-color: transparent; color: {text}; }}
 QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget {{
-    background-color: {editor}; color: {text}; border: 1px solid {border};
-    border-radius: 6px; padding: 2px;
+    background-color: {editor}; color: {text}; border: none;
+    border-radius: 12px; padding: 8px;
 }}
 QPushButton {{
-    background-color: {sidebar}; color: {text}; border: 1px solid {border};
-    border-radius: 6px; padding: 4px 10px;
+    background-color: {accent}; color: white; border: none;
+    border-radius: 10px; padding: 6px 14px;
 }}
-QPushButton:hover {{ background-color: {accent}; color: white; }}
-QPushButton:checked {{ background-color: {accent}; color: white; }}
-QToolBar {{ background-color: {sidebar}; border: none; spacing: 6px; padding: 4px; }}
-QStatusBar {{ background-color: {sidebar}; }}
-QMenuBar {{ background-color: {sidebar}; color: {text}; }}
+QPushButton:hover {{ background-color: {text}; color: white; }}
+QPushButton:checked {{ background-color: {text}; color: white; }}
+QToolBar {{ background-color: transparent; border: none; spacing: 8px; padding: 6px; }}
+QStatusBar {{ background-color: transparent; border: none; }}
+QStatusBar::item {{ border: none; }}
+QMenuBar {{ background-color: transparent; color: {text}; }}
 QMenuBar::item {{ background: transparent; padding: 4px 8px; }}
-QMenuBar::item:selected {{ background-color: {accent}; color: white; border-radius: 4px; }}
-QMenu {{ background-color: {sidebar}; color: {text}; border: 1px solid {border}; }}
+QMenuBar::item:selected {{ background-color: {accent}; color: white; border-radius: 6px; }}
+QMenu {{ background-color: {sidebar}; color: {text}; border: none; border-radius: 8px; }}
 QMenu::item:selected {{ background-color: {accent}; color: white; }}
 QComboBox, QSpinBox {{
-    background-color: {editor}; color: {text}; border: 1px solid {border};
-    border-radius: 6px; padding: 2px 4px;
+    background-color: {editor}; color: {text}; border: none;
+    border-radius: 8px; padding: 4px 8px;
 }}
 QComboBox QAbstractItemView {{
-    background-color: {sidebar}; color: {text};
+    background-color: {sidebar}; color: {text}; border: none;
     selection-background-color: {accent}; selection-color: white;
 }}
+QListWidget {{ outline: none; }}
+QListWidget::item {{ border-radius: 8px; }}
 QListWidget::item:selected {{ background-color: {accent}; color: white; }}
-QGroupBox {{ border: 1px solid {border}; border-radius: 6px; margin-top: 8px; }}
+QGroupBox {{ border: none; border-radius: 8px; margin-top: 8px;
+    background-color: {editor}; }}
 QGroupBox::title {{ subcontrol-origin: margin; left: 8px; padding: 0 4px; }}
+QSplitter::handle {{ background: transparent; }}
+QScrollBar:vertical {{ background: transparent; width: 8px; margin: 2px; }}
+QScrollBar::handle:vertical {{ background: {accent}; border-radius: 4px;
+    min-height: 24px; }}
+QScrollBar::add-line:vertical, QScrollBar::sub-line:vertical {{ height: 0; }}
 #CustomTitleBar {{ background-color: {sidebar}; }}
 """
 

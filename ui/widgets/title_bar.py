@@ -179,6 +179,19 @@ class _EdgeGrip(QWidget):
         return QRect(QPoint(left, top), QPoint(right, bottom))
 
 
+class _InvisibleSizeGrip(QSizeGrip):
+    """크기 조절 기능은 유지하되 시각적으로는 보이지 않는 사이즈 그립.
+
+    기본 :class:`QSizeGrip` 은 모서리에 대각선 빗금을 그려 UI 를 가린다.
+    ``paintEvent`` 를 비워 그리기를 생략하면, 드래그로 창 크기를 조절하는
+    동작은 그대로 유지하면서 핸들이 화면에 보이지 않도록 만들 수 있다.
+    """
+
+    def paintEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        # 아무 것도 그리지 않아 핸들을 숨긴다(리사이즈 동작은 유지).
+        return
+
+
 class FramelessResizer:
     """프레임리스 창에 가장자리/모서리 리사이즈 핸들을 부착해 관리한다."""
 
@@ -191,8 +204,9 @@ class FramelessResizer:
             Qt.TopEdge: _EdgeGrip(window, Qt.TopEdge),
             Qt.BottomEdge: _EdgeGrip(window, Qt.BottomEdge),
         }
-        # 네 모서리는 네이티브 동작의 QSizeGrip 사용.
-        self._corners = [QSizeGrip(window) for _ in range(4)]
+        # 네 모서리는 네이티브 동작의 QSizeGrip 을 쓰되, 빗금이 UI 를 가리지
+        # 않도록 그리기를 생략한 투명 그립을 사용한다.
+        self._corners = [_InvisibleSizeGrip(window) for _ in range(4)]
         for grip in self._corners:
             grip.setFixedSize(margin * 2, margin * 2)
 
