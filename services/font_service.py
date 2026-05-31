@@ -24,7 +24,7 @@ from PySide6.QtCore import QObject, Signal
 from PySide6.QtGui import QFontDatabase
 
 from config.settings import APP_DIR
-from services.markdown_style_service import MARKDOWN_ELEMENTS
+from services.markdown_style_service import MARKDOWN_ELEMENTS, MARKDOWN_SELECTORS
 
 logger = logging.getLogger(__name__)
 
@@ -38,7 +38,7 @@ FONT_TARGETS: dict[str, str] = {"base": "기본 텍스트", **MARKDOWN_ELEMENTS}
 # CSS 선택자 매핑(base 는 body 전체).
 _TARGET_SELECTORS: dict[str, str] = {
     "base": "body",
-    **{element: f".md-{element}" for element in MARKDOWN_ELEMENTS},
+    **MARKDOWN_SELECTORS,
 }
 
 # 지원하는 폰트 파일 확장자.

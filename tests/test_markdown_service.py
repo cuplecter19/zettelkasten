@@ -18,6 +18,13 @@ def test_paragraph_and_list_classes():
     assert 'class="md-li"' in html
 
 
+def test_markdown_table_gets_table_cell_classes():
+    html = render_markdown("| 제목 | 값 |\n| --- | --- |\n| 하나 | 둘 |")
+    assert 'class="md-table"' in html
+    assert 'class="md-th"' in html
+    assert 'class="md-td"' in html
+
+
 def test_empty_input_returns_empty():
     assert render_markdown("") == ""
 

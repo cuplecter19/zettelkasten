@@ -19,6 +19,7 @@ from pathlib import Path
 from PySide6.QtCore import QObject, Signal
 
 from config.settings import APP_DIR
+from services.theme_service import DEFAULT_THEME
 
 logger = logging.getLogger(__name__)
 
@@ -30,9 +31,18 @@ MARKDOWN_ELEMENTS: dict[str, str] = {
     "h2":         "제목 2",
     "h3":         "제목 3",
     "p":          "본문",
+    "ul":         "리스트",
     "blockquote": "인용구",
     "code":       "코드",
+    "table":      "테이블",
+    "th":         "테이블 헤더",
+    "td":         "테이블 내용",
     "a":          "링크",
+}
+
+MARKDOWN_SELECTORS: dict[str, str] = {
+    "ul": ".md-ul, .md-ol, .md-li",
+    **{element: f".md-{element}" for element in MARKDOWN_ELEMENTS if element != "ul"},
 }
 
 # 편집 가능한 서식 필드와 기본 검증.
@@ -40,12 +50,16 @@ _FIELDS = ("font_size", "color", "bold", "italic")
 
 # 요소별 기본 서식(다크 테마 기준).
 DEFAULT_MARKDOWN_STYLES: dict[str, dict] = {
-    "h1":         {"font_size": 28, "color": "#e0e0e0", "bold": True,  "italic": False},
-    "h2":         {"font_size": 24, "color": "#e0e0e0", "bold": True,  "italic": False},
-    "h3":         {"font_size": 20, "color": "#e0e0e0", "bold": True,  "italic": False},
-    "p":          {"font_size": 14, "color": "#e0e0e0", "bold": False, "italic": False},
+    "h1":         {"font_size": 28, "color": DEFAULT_THEME["text"], "bold": True,  "italic": False},
+    "h2":         {"font_size": 24, "color": DEFAULT_THEME["text"], "bold": True,  "italic": False},
+    "h3":         {"font_size": 20, "color": DEFAULT_THEME["text"], "bold": True,  "italic": False},
+    "p":          {"font_size": 14, "color": DEFAULT_THEME["text"], "bold": False, "italic": False},
+    "ul":         {"font_size": 14, "color": DEFAULT_THEME["text"], "bold": False, "italic": False},
     "blockquote": {"font_size": 14, "color": "#a0a0a0", "bold": False, "italic": True},
     "code":       {"font_size": 13, "color": "#d7ba7d", "bold": False, "italic": False},
+    "table":      {"font_size": 14, "color": DEFAULT_THEME["text"], "bold": False, "italic": False},
+    "th":         {"font_size": 14, "color": DEFAULT_THEME["text"], "bold": True,  "italic": False},
+    "td":         {"font_size": 14, "color": DEFAULT_THEME["text"], "bold": False, "italic": False},
     "a":          {"font_size": 14, "color": "#4a90d9", "bold": False, "italic": False},
 }
 
@@ -71,7 +85,8 @@ def build_css(styles: dict[str, dict]) -> str:
             f"font-weight: {weight}; "
             f"font-style: {font_style};"
         )
-        rules.append(f".md-{element} {{ {decls} }}")
+        selector = MARKDOWN_SELECTORS.get(element, f".md-{element}")
+        rules.append(f"{selector} {{ {decls} }}")
     return "\n".join(rules)
 
 

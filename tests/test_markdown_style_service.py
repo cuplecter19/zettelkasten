@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from services.markdown_style_service import (DEFAULT_MARKDOWN_STYLES,
                                              MarkdownStyleService, build_css)
+from services.theme_service import DEFAULT_THEME
 
 
 def _service(tmp_path) -> MarkdownStyleService:
@@ -13,6 +14,9 @@ def _service(tmp_path) -> MarkdownStyleService:
 def test_build_css_targets_md_classes():
     css = build_css(DEFAULT_MARKDOWN_STYLES)
     assert ".md-h1 {" in css
+    assert ".md-ul, .md-ol, .md-li {" in css
+    assert ".md-th {" in css
+    assert ".md-td {" in css
     assert ".md-blockquote {" in css
     assert "font-size:" in css
     assert "color:" in css
@@ -22,8 +26,23 @@ def test_default_bold_and_italic_reflected_in_css(tmp_path):
     service = _service(tmp_path)
     css = service.build_css()
     # h1 은 기본 굵게, 인용구는 기본 기울임.
-    assert ".md-h1 { font-size: 28px; color: #e0e0e0; font-weight: bold;" in css
+    assert (f".md-h1 {{ font-size: 28px; color: {DEFAULT_THEME['text']}; "
+            "font-weight: bold;") in css
     assert "font-style: italic;" in css  # blockquote
+
+
+def test_heading_and_body_defaults_match_theme_text_color(tmp_path):
+    service = _service(tmp_path)
+    for element in ("h1", "h2", "h3", "p"):
+        assert service.get_style(element)["color"] == DEFAULT_THEME["text"]
+
+
+def test_table_header_and_body_can_be_styled_separately(tmp_path):
+    service = _service(tmp_path)
+    service.set_field("th", "bold", False)
+    service.set_field("td", "italic", True)
+    assert service.get_style("th")["bold"] is False
+    assert service.get_style("td")["italic"] is True
 
 
 def test_set_field_persists_and_emits(qtbot, tmp_path):

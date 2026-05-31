@@ -65,15 +65,19 @@ def build_stylesheet(colors: dict[str, str]) -> str:
     white = colors.get("white", DEFAULT_THEME["white"])
     # 외곽선을 없애고 둥근 모서리 위주의 파스텔 UI 를 구성한다.
     return f"""
-QMainWindow, QDialog {{ background-color: {bg}; color: {text}; }}
+QMainWindow, QDialog, QMessageBox, QDockWidget {{
+    background-color: {bg}; color: {text};
+}}
 QMainWindow > QWidget, QDialog > QWidget, QDialog#SettingsDialog,
 QDialog#SettingsDialog QWidget#SettingsPage,
 QDialog#SettingsDialog QListWidget#SettingsCategoryList,
-QDialog#SettingsDialog QStackedWidget#SettingsStack {{
+QDialog#SettingsDialog QStackedWidget#SettingsStack,
+QMessageBox QLabel, QDockWidget > QWidget {{
     background-color: {bg}; color: {text};
 }}
 QWidget {{ background-color: transparent; color: {text}; }}
-QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget {{
+QLineEdit, QTextEdit, QPlainTextEdit, QTextBrowser, QListWidget,
+QGraphicsView {{
     background-color: {editor}; color: {text}; border: none;
     border-radius: 12px; padding: 8px;
 }}
@@ -86,6 +90,14 @@ QPushButton:checked {{ background-color: {text}; color: {white}; }}
 QToolBar {{ background-color: transparent; border: none; spacing: 8px; padding: 6px; }}
 QStatusBar {{ background-color: transparent; border: none; }}
 QStatusBar::item {{ border: none; }}
+QDockWidget::title {{
+    background-color: {sidebar}; color: {text}; border: none;
+    border-radius: 8px; padding: 6px 10px;
+}}
+QDockWidget::close-button, QDockWidget::float-button {{
+    background-color: {accent}; border: none; border-radius: 4px;
+    width: 14px; height: 14px; margin: 4px;
+}}
 QMenuBar {{ background-color: transparent; color: {text}; }}
 QMenuBar::item {{ background: transparent; padding: 6px 14px; }}
 QMenuBar::item:selected {{ background-color: {accent}; color: {white}; border-radius: 6px; }}
