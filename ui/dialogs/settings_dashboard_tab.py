@@ -10,9 +10,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from PySide6.QtCore import Qt
-from PySide6.QtWidgets import (QFrame, QGridLayout, QGroupBox, QHBoxLayout,
-                               QLabel, QPushButton, QVBoxLayout, QWidget)
+from PySide6.QtGui import QColor
+from PySide6.QtWidgets import (QColorDialog, QFileDialog, QFrame, QGridLayout,
+                               QGroupBox, QHBoxLayout, QLabel, QPushButton,
+                               QVBoxLayout, QWidget)
 
 from services.dashboard_service import NOTE_TYPE_LABELS, DashboardService
 from services.panel_service import PanelService, get_panel_service
@@ -35,6 +39,34 @@ class SettingsDashboardTab(QWidget):
         self._panel_widgets: dict[str, QWidget] = {}
 
         root = QVBoxLayout(self)
+
+        welcome = QGroupBox("첫 화면", self)
+        welcome_layout = QVBoxLayout(welcome)
+        welcome_guide = QLabel(
+            "프로그램을 켰을 때 보이는 무압박 대시보드의 색상 또는 이미지를 "
+            "설정합니다. 이미지를 지정하면 색상 위에 이미지가 표시됩니다.",
+            self,
+        )
+        welcome_guide.setWordWrap(True)
+        welcome_layout.addWidget(welcome_guide)
+
+        welcome_buttons = QHBoxLayout()
+        self._welcome_color_btn = QPushButton(self)
+        self._welcome_color_btn.clicked.connect(self._pick_welcome_color)
+        welcome_buttons.addWidget(self._welcome_color_btn)
+        image_btn = QPushButton("이미지 선택…", self)
+        image_btn.clicked.connect(self._pick_welcome_image)
+        welcome_buttons.addWidget(image_btn)
+        clear_image_btn = QPushButton("이미지 제거", self)
+        clear_image_btn.clicked.connect(self._clear_welcome_image)
+        welcome_buttons.addWidget(clear_image_btn)
+        welcome_buttons.addStretch(1)
+        welcome_layout.addLayout(welcome_buttons)
+
+        self._welcome_image_label = QLabel(self)
+        self._welcome_image_label.setTextInteractionFlags(Qt.TextSelectableByMouse)
+        welcome_layout.addWidget(self._welcome_image_label)
+        root.addWidget(welcome)
 
         # 상단: 핵심 요약 카드.
         summary = QGroupBox("요약", self)
@@ -72,7 +104,9 @@ class SettingsDashboardTab(QWidget):
 
         # 패널 모드 변경 시 표시/숨김을 갱신.
         self._panels.panels_changed.connect(self._apply_panel_visibility)
+        self._dashboard.settings_changed.connect(self._sync_welcome_controls)
         self._apply_panel_visibility()
+        self._sync_welcome_controls()
         self.refresh()
 
     def _add_metric(self, grid: QGridLayout, row: int, key: str,
@@ -101,6 +135,40 @@ class SettingsDashboardTab(QWidget):
                 label.setText(str(by_type.get(key[len("type:"):], 0)))
             else:
                 label.setText(str(stats.get(key, 0)))
+
+    def _pick_welcome_color(self) -> None:
+        current = QColor(self._dashboard.welcome_color())
+        color = QColorDialog.getColor(current, self, "첫 화면 색상")
+        if color.isValid():
+            self._dashboard.set_welcome_color(color.name())
+            self._sync_welcome_controls()
+
+    def _pick_welcome_image(self) -> None:
+        path, _ = QFileDialog.getOpenFileName(
+            self, "첫 화면 이미지 선택", "",
+            "Images (*.png *.jpg *.jpeg *.bmp *.gif)")
+        if path:
+            self._dashboard.set_welcome_image_path(path)
+            self._sync_welcome_controls()
+
+    def _clear_welcome_image(self) -> None:
+        self._dashboard.set_welcome_image_path("")
+        self._sync_welcome_controls()
+
+    def _sync_welcome_controls(self) -> None:
+        color = self._dashboard.welcome_color()
+        qcolor = QColor(color)
+        text_color = "#000000" if qcolor.lightness() > 140 else "#ffffff"
+        self._welcome_color_btn.setText(f"색상: {color}")
+        self._welcome_color_btn.setStyleSheet(
+            f"background-color: {color}; color: {text_color};"
+            "border: 1px solid #555; border-radius: 4px;")
+        image_path = self._dashboard.welcome_image_path()
+        if image_path:
+            self._welcome_image_label.setText(
+                f"이미지: {Path(image_path).name}\n{image_path}")
+        else:
+            self._welcome_image_label.setText("이미지: 설정 안 함")
 
 
 if __name__ == "__main__":
