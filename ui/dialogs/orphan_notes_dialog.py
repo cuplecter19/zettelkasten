@@ -25,7 +25,6 @@ class OrphanNotesDialog(QDialog):
             color: #3a3f47;
         }
         QDialog#OrphanNotesDialog QListWidget {
-            background-color: #fffdf8;
             border: none;
             border-radius: 12px;
             padding: 8px;

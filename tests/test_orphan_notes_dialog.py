@@ -16,6 +16,7 @@ def test_orphan_dialog_has_styled_background(qtbot, db):
     assert dialog.objectName() == "OrphanNotesDialog"
     assert dialog.testAttribute(Qt.WA_StyledBackground)
     assert dialog._list.count() == 1
+    assert "#fffdf8" not in dialog.styleSheet()
 
 
 def test_orphan_dialog_emits_requested_note(qtbot, db):

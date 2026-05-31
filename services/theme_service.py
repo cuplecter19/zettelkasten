@@ -75,7 +75,7 @@ QDialog#SettingsDialog QStackedWidget#SettingsStack,
 QMessageBox QLabel, QDockWidget > QWidget, QDockWidget QWidget {{
     background-color: {bg}; color: {text};
 }}
-QWidget {{ background-color: {bg}; color: {text}; }}
+QWidget {{ color: {text}; }}
 QWidget#PDFPanel, QWidget#GraphPanel,
 QMessageBox QWidget, QMessageBox QLabel, QMessageBox QFrame,
 QMessageBox QDialogButtonBox {{

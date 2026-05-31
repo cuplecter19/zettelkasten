@@ -59,9 +59,11 @@ class StartupDashboardOverlay(QWidget):
         """)
         if not self._pixmap.isNull() and Path(self._image_path).exists():
             self._image.show()
+            self._message.hide()
             self._update_pixmap()
         else:
             self._image.hide()
+            self._message.show()
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)

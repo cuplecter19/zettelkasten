@@ -69,6 +69,7 @@ def test_build_stylesheet_paints_settings_background():
     assert "QWidget#SettingsPage" in qss
     assert "QListWidget#SettingsCategoryList" in qss
     assert "QStackedWidget#SettingsStack" in qss
+    assert "QWidget { background-color: #010203;" not in qss
 
 
 def test_build_stylesheet_paints_docked_panels_and_message_boxes():
