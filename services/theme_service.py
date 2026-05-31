@@ -22,8 +22,8 @@ logger = logging.getLogger(__name__)
 THEME_PATH = APP_DIR / "theme.json"
 
 # 커스터마이징 가능한 UI 요소의 기본 색상(라이트 테마).
-# 첨부된 기본 UI 시안과 동일한 밝은 블루-그레이 팔레트를 사용한다. 사용자가
-# 설정의 디자인 탭에서 색상을 지정하면 그 값이 이 기본값보다 우선한다.
+# 기본 배경은 흰색이며, 사용자가 설정의 디자인 탭에서 색상을 지정하면 그 값이
+# 이 기본값보다 우선한다.
 DEFAULT_THEME: dict[str, str] = {
     "background":   "#ffffff",
     "sidebar":      "#e2e6ef",
