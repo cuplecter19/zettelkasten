@@ -56,13 +56,25 @@ class _ShadowFrame(QWidget):
         self._bg_color = QColor(color)
         self.update()
 
-    def resizeEvent(self, event) -> None:  # noqa: N802
+    def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
-        from PySide6.QtCore import QRectF
-        from PySide6.QtGui import QPainterPath, QRegion
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(self.rect()), self._RADIUS, self._RADIUS)
-        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
+        from PySide6.QtGui import QRegion
+        
+        rect = self.rect()
+        radius = self._RADIUS
+        
+        region = QRegion(rect, QRegion.Rectangle)
+        region -= QRegion(rect.x(), rect.y(), radius*2, radius*2)
+        region -= QRegion(rect.right()-radius*2+1, rect.y(), radius*2, radius*2)
+        region -= QRegion(rect.x(), rect.bottom()-radius*2+1, radius*2, radius*2)
+        region -= QRegion(rect.right()-radius*2+1, rect.bottom()-radius*2+1, radius*2, radius*2)
+        
+        region += QRegion(rect.x(), rect.y(), radius*2, radius*2, QRegion.Ellipse)
+        region += QRegion(rect.right()-radius*2+1, rect.y(), radius*2, radius*2, QRegion.Ellipse)
+        region += QRegion(rect.x(), rect.bottom()-radius*2+1, radius*2, radius*2, QRegion.Ellipse)
+        region += QRegion(rect.right()-radius*2+1, rect.bottom()-radius*2+1, radius*2, radius*2, QRegion.Ellipse)
+        
+        self.setMask(region)
 
     def paintEvent(self, event) -> None:  # noqa: N802
         from PySide6.QtCore import QRectF
@@ -134,14 +146,13 @@ class MainWindow(QMainWindow):
         if getattr(self, "_shadow_frame", None) is not None:
             self._shadow_frame.set_bg_color(self._theme.get_color("background"))
 
-    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+    def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        # 그림자 프레임이 메인 윈도우 크기를 따라가도록
+        if hasattr(self, '_shadow_frame'):
+            self._shadow_frame.setGeometry(self.rect())
+        # 자기 자신의 라운딩 마스크 갱신
         self._apply_rounded_mask()
-        if getattr(self, "_resizer", None) is not None:
-            self._resizer.reposition()
-        if getattr(self, "_startup_dashboard", None) is not None:
-            self._startup_dashboard.setGeometry(self.rect())
-        self._update_shadow_frame()
 
     def changeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         """최대화/복원 시 그림자 여백과 마스크를 조정한다."""
@@ -154,17 +165,26 @@ class MainWindow(QMainWindow):
             self._update_shadow_frame()
 
     def _apply_rounded_mask(self) -> None:
-        """프레임리스 창의 네 모서리를 둥글게 잘라낸다."""
-        from PySide6.QtCore import QRectF
-        from PySide6.QtGui import QPainterPath, QRegion
-
+        from PySide6.QtGui import QRegion
+        
         if self.isMaximized():
             self.clearMask()
             return
+        
+        rect = self.rect()
         radius = 24
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(self.rect()), radius, radius)
-        region = QRegion(path.toFillPolygon().toPolygon())
+        
+        region = QRegion(rect, QRegion.Rectangle)
+        region -= QRegion(rect.x(), rect.y(), radius*2, radius*2)
+        region -= QRegion(rect.right()-radius*2+1, rect.y(), radius*2, radius*2)
+        region -= QRegion(rect.x(), rect.bottom()-radius*2+1, radius*2, radius*2)
+        region -= QRegion(rect.right()-radius*2+1, rect.bottom()-radius*2+1, radius*2, radius*2)
+        
+        region += QRegion(rect.x(), rect.y(), radius*2, radius*2, QRegion.Ellipse)
+        region += QRegion(rect.right()-radius*2+1, rect.y(), radius*2, radius*2, QRegion.Ellipse)
+        region += QRegion(rect.x(), rect.bottom()-radius*2+1, radius*2, radius*2, QRegion.Ellipse)
+        region += QRegion(rect.right()-radius*2+1, rect.bottom()-radius*2+1, radius*2, radius*2, QRegion.Ellipse)
+        
         self.setMask(region)
 
     def _setup_shadow_frame(self) -> None:
