@@ -52,6 +52,13 @@ def _enable_sqlite_fks(dbapi_connection, _record) -> None:
     cursor.execute("PRAGMA foreign_keys=ON")
     cursor.close()
 
+def _enable_sqlite_pragmas(dbapi_connection, _record) -> None:
+    """SQLite 안정성 및 동시성 개선용 PRAGMA 설정."""
+    cursor = dbapi_connection.cursor()
+    cursor.execute("PRAGMA journal_mode=WAL")
+    cursor.execute("PRAGMA synchronous=NORMAL")
+    cursor.execute("PRAGMA busy_timeout=5000")
+    cursor.close()
 
 def _ensure_sync_columns(conn: Connection) -> None:
     for table, column, definition in SYNC_COLUMNS:
@@ -73,7 +80,7 @@ def init_server_db() -> Engine:
 
     _engine = create_engine(f"sqlite:///{DB_PATH}", future=True)
     event.listen(_engine, "connect", _enable_sqlite_fks)
-
+    event.listen(_engine, "connect", _enable_sqlite_pragmas)
     schema_sql = _schema_path().read_text(encoding="utf-8")
     with _engine.begin() as conn:
         # SQLite 는 executescript 가 필요하므로 raw 연결로 실행한다.
