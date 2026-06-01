@@ -5,11 +5,12 @@ from __future__ import annotations
 import logging
 from pathlib import Path
 
-from PySide6.QtCore import QEvent, Qt, QThread, Signal
-from PySide6.QtGui import QPixmap
-from PySide6.QtWidgets import (QFileDialog, QFrame, QHBoxLayout, QLabel,
-                               QLineEdit, QMessageBox, QPushButton, QTextBrowser,
-                               QTextEdit, QToolButton, QVBoxLayout, QWidget)
+from PySide6.QtCore import QEvent, QSignalBlocker, Qt, QThread, Signal
+from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QHBoxLayout,
+                               QLabel, QLineEdit, QMessageBox, QPushButton,
+                               QTextBrowser, QTextEdit, QToolButton,
+                               QVBoxLayout, QWidget)
 
 from config.categories import NOTE_TYPE_COLORS
 from core.note import Note
@@ -21,12 +22,14 @@ from services.css_snippet_service import get_css_snippet_service
 from services.font_service import get_font_service
 from services.markdown_service import render_document
 from services.markdown_style_service import get_markdown_style_service
+from services.theme_service import get_theme_service
 from ui.widgets.tag_chip import TagChip
 
 logger = logging.getLogger(__name__)
 
 _IMAGE_PDF_FILTER = (
     "첨부 파일 (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.pdf);;모든 파일 (*)")
+_NOTE_TYPES = tuple(NOTE_TYPE_COLORS)
 
 
 class _ThumbnailWorker(QThread):
@@ -130,6 +133,7 @@ class EditorPanel(QWidget):
         self._md_style = get_markdown_style_service()
         self._css_snippets = get_css_snippet_service()
         self._fonts = get_font_service()
+        self._theme = get_theme_service()
         self._current_id: str | None = None
         self._suggested_type: str | None = None
         self._workers: list[_ThumbnailWorker] = []
@@ -151,7 +155,18 @@ class EditorPanel(QWidget):
         self._title = QLineEdit(self)
         self._title.setPlaceholderText("제목")
         self._title.setStyleSheet("font-size: 18px; font-weight: bold;")
-        layout.addWidget(self._title)
+
+        title_row = QHBoxLayout()
+        title_row.setSpacing(8)
+        title_row.addWidget(self._title, 1)
+        self._category = QComboBox(self)
+        self._category.setObjectName("CategoryDropdown")
+        self._category.setCursor(Qt.PointingHandCursor)
+        self._category.addItems(_NOTE_TYPES)
+        self._category.currentTextChanged.connect(self._on_category_changed)
+        title_row.addWidget(self._category)
+        layout.addLayout(title_row)
+        self._refresh_category_colors()
 
         # 자동 분류 제안 배너.
         self._banner = QFrame(self)
@@ -182,6 +197,7 @@ class EditorPanel(QWidget):
         self._md_style.style_changed.connect(self._refresh_preview)
         self._css_snippets.snippets_changed.connect(self._refresh_preview)
         self._fonts.fonts_changed.connect(self._refresh_preview)
+        self._theme.theme_changed.connect(self._refresh_category_colors)
 
         # PDF 등 첨부 카드 영역.
         self._attach_container = QWidget(self)
@@ -212,11 +228,17 @@ class EditorPanel(QWidget):
         if note is None:
             self._title.clear()
             self._body.clear()
+            with QSignalBlocker(self._category):
+                self._category.setCurrentText("IDEA")
+            self._apply_category_style("IDEA")
             self._banner.setVisible(False)
             self._clear_attachment_cards()
             return
         self._title.setText(note.title)
         self._body.setPlainText(note.body)
+        with QSignalBlocker(self._category):
+            self._category.setCurrentText(note.note_type)
+        self._apply_category_style(note.note_type)
         self._refresh_tags()
         self._refresh_attachments()
         self._update_suggestion_banner()
@@ -418,14 +440,59 @@ class EditorPanel(QWidget):
         if self._current_id is None or self._suggested_type is None:
             return
         try:
-            color = NOTE_TYPE_COLORS.get(self._suggested_type)
+            color = self._category_color(self._suggested_type)
             self._repo.update(self._current_id,
                               note_type=self._suggested_type,
                               color_hint=color)
+            with QSignalBlocker(self._category):
+                self._category.setCurrentText(self._suggested_type)
+            self._apply_category_style(self._suggested_type)
             self._banner.setVisible(False)
             self.note_saved.emit(self._current_id)
         except Exception:
             logger.exception("Failed to apply type suggestion")
+
+    # ----- 카테고리 --------------------------------------------------------
+    def _category_color(self, note_type: str) -> str:
+        return self._theme.get_card_color(note_type) or NOTE_TYPE_COLORS.get(
+            note_type, "#777777")
+
+    def _refresh_category_colors(self) -> None:
+        for index in range(self._category.count()):
+            note_type = self._category.itemText(index)
+            color = self._category_color(note_type)
+            self._category.setItemData(index, QColor(color), Qt.BackgroundRole)
+            self._category.setItemData(index, QColor("#ffffff"),
+                                       Qt.ForegroundRole)
+        self._apply_category_style(self._category.currentText() or "IDEA")
+
+    def _apply_category_style(self, note_type: str) -> None:
+        color = self._category_color(note_type)
+        self._category.setStyleSheet(
+            "QComboBox#CategoryDropdown {"
+            f" background-color: {color}; color: #ffffff; border: none;"
+            " border-radius: 10px; padding: 6px 12px; font-weight: bold; }"
+            "QComboBox#CategoryDropdown::drop-down { border: none; width: 18px; }"
+            "QComboBox#CategoryDropdown QAbstractItemView {"
+            " border: none; outline: none; }"
+        )
+
+    def _on_category_changed(self, note_type: str) -> None:
+        if self._current_id is None or not note_type:
+            self._apply_category_style(note_type or "IDEA")
+            return
+        self._apply_category_style(note_type)
+        try:
+            self._repo.update(
+                self._current_id,
+                note_type=note_type,
+                color_hint=self._category_color(note_type),
+            )
+            self.note_saved.emit(self._current_id)
+            self._update_suggestion_banner()
+        except Exception:
+            logger.exception("Category update failed")
+            QMessageBox.warning(self, "오류", "카테고리를 저장하지 못했습니다.")
 
     # ----- 태그 ----------------------------------------------------------
     def _refresh_tags(self) -> None:
