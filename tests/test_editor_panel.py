@@ -9,6 +9,7 @@ from db.repositories.note_repo import NoteRepository
 from services.attachment_service import AttachmentService
 from services.css_snippet_service import CssSnippetService
 from services.markdown_style_service import MarkdownStyleService
+from services.theme_service import ThemeService
 from ui.panels.editor_panel import EditorPanel, ImageAttachmentCard
 
 
@@ -78,6 +79,32 @@ def test_loading_note_resets_markdown_toggle(qtbot, db):
 
     panel.load_note(note)  # 다시 로드하면 편집 모드로 복귀.
     assert panel._md_toggle.isChecked() is False
+
+
+def test_category_dropdown_loads_note_type(qtbot, db):
+    note = NoteRepository().create("제목", "본문", "MOOD")
+    panel = EditorPanel()
+    qtbot.addWidget(panel)
+
+    panel.load_note(note)
+
+    assert panel._category.currentText() == "MOOD"
+
+
+def test_category_dropdown_saves_type_and_custom_color(qtbot, db, tmp_path):
+    note = NoteRepository().create("제목", "본문", "IDEA")
+    panel = EditorPanel()
+    panel._theme = ThemeService(tmp_path / "theme.json")
+    panel._theme.set_color("card_ARCHIVE", "#123456")
+    qtbot.addWidget(panel)
+    panel.load_note(note)
+
+    panel._category.setCurrentText("ARCHIVE")
+
+    updated = NoteRepository().get_by_id(note.id)
+    assert updated.note_type == "ARCHIVE"
+    assert updated.color_hint == "#123456"
+    assert "#123456" in panel._category.styleSheet()
 
 
 def test_preview_applies_markdown_and_snippet_css(qtbot, db, tmp_path):
