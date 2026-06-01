@@ -284,14 +284,13 @@ class SyncService(QObject):
 
     @Slot()
     def _tick(self) -> None:
-        try:
-            if self.is_online():
-                self.full_sync()
-        except Exception:
-            logger.exception("자동 동기화 중 오류")
+        # QTimer는 self._thread에 있으나 _tick 슬롯은 SyncService(메인 스레드) 소속이므로
+        # Qt QueuedConnection으로 메인 스레드에서 호출된다. httpx 블로킹을 피하려면
+        # 반드시 워커 스레드에 실제 동기화를 위임해야 한다.
+        self.run_full_sync_async()
 
     def stop_auto_sync(self) -> None:
-        """자동 동기화 타이머를 중지한다."""
+        """자동 동기화 타이머를 중지하고 진행 중인 워커가 끝날 때까지 기다린다."""
         if self._timer is not None:
             self._timer.stop()
         if self._thread is not None:
@@ -299,6 +298,8 @@ class SyncService(QObject):
             self._thread.wait(2000)
             self._thread = None
             self._timer = None
+        for worker in list(self._workers):
+            worker.wait(5000)
 
     def run_full_sync_async(self) -> "QThread":
         """수동 "지금 동기화": 단발성 QThread 에서 ``full_sync()`` 를 실행한다."""

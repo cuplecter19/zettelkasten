@@ -151,7 +151,9 @@ class NoteRepository:
         with get_session() as session:
             stmt = select(Note)
             if since is not None:
-                stmt = stmt.where(Note.updated_at > since)
+                stmt = stmt.where(
+                    (Note.updated_at > since) | (Note.deleted_at > since)
+                )
             return list(session.scalars(stmt).all())
 
     def upsert_remote(self, record: dict) -> None:

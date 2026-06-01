@@ -119,6 +119,7 @@ class MainWindow(QMainWindow):
         ss += (
             "\nQMainWindow { background-color: transparent; }"
             "\n#WindowHeader { background-color: transparent; }"
+            "\nQStatusBar { background-color: transparent; }"
         )
         self.setStyleSheet(ss)
         if getattr(self, "_shadow_frame", None) is not None:

@@ -464,6 +464,8 @@ class EditorPanel(QWidget):
             self._category.setItemData(index, QColor(color), Qt.BackgroundRole)
             self._category.setItemData(index, QColor("#ffffff"),
                                        Qt.ForegroundRole)
+            self._category.setItemData(index, int(Qt.AlignCenter),
+                                       Qt.TextAlignmentRole)
         self._apply_category_style(self._category.currentText() or "IDEA")
 
     def _apply_category_style(self, note_type: str) -> None:
@@ -471,7 +473,8 @@ class EditorPanel(QWidget):
         self._category.setStyleSheet(
             "QComboBox#CategoryDropdown {"
             f" background-color: {color}; color: #ffffff; border: none;"
-            " border-radius: 10px; padding: 6px 12px; font-weight: bold; }"
+            " border-radius: 10px; padding: 6px 12px; font-weight: bold;"
+            " text-align: center; }"
             "QComboBox#CategoryDropdown::drop-down { border: none; width: 18px; }"
             "QComboBox#CategoryDropdown QAbstractItemView {"
             " border: none; outline: none; }"
