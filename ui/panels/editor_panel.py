@@ -470,12 +470,24 @@ class EditorPanel(QWidget):
 
     def _apply_category_style(self, note_type: str) -> None:
         color = self._category_color(note_type)
+        # 흰색 삼각형 화살표 — 외부 파일 없이 SVG data URI 인라인 사용.
+        # 좌측 패딩(22px)을 드롭다운 영역 너비(20px)와 맞춰 텍스트 중앙 정렬 유지.
+        arrow = (
+            "data:image/svg+xml,"
+            "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E"
+            "%3Cpolygon points='0,0 10,0 5,6' fill='white'/%3E"
+            "%3C/svg%3E"
+        )
         self._category.setStyleSheet(
             "QComboBox#CategoryDropdown {"
             f" background-color: {color}; color: #ffffff; border: none;"
-            " border-radius: 10px; padding: 6px 12px; font-weight: bold;"
-            " text-align: center; }"
-            "QComboBox#CategoryDropdown::drop-down { border: none; width: 18px; }"
+            " border-radius: 10px; padding: 6px 8px 6px 22px;"
+            " font-weight: bold; text-align: center; }"
+            "QComboBox#CategoryDropdown::drop-down {"
+            " border: none; width: 20px;"
+            " subcontrol-origin: padding; subcontrol-position: right center; }"
+            f"QComboBox#CategoryDropdown::down-arrow {{ image: url(\"{arrow}\");"
+            " width: 10px; height: 6px; }"
             "QComboBox#CategoryDropdown QAbstractItemView {"
             " border: none; outline: none; }"
         )

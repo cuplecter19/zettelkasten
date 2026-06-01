@@ -56,6 +56,14 @@ class _ShadowFrame(QWidget):
         self._bg_color = QColor(color)
         self.update()
 
+    def resizeEvent(self, event) -> None:  # noqa: N802
+        super().resizeEvent(event)
+        from PySide6.QtCore import QRectF
+        from PySide6.QtGui import QPainterPath, QRegion
+        path = QPainterPath()
+        path.addRoundedRect(QRectF(self.rect()), self._RADIUS, self._RADIUS)
+        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
+
     def paintEvent(self, event) -> None:  # noqa: N802
         from PySide6.QtCore import QRectF
         painter = QPainter(self)
@@ -120,6 +128,7 @@ class MainWindow(QMainWindow):
             "\nQMainWindow { background-color: transparent; }"
             "\n#WindowHeader { background-color: transparent; }"
             "\nQStatusBar { background-color: transparent; }"
+            "\nQSplitter { background-color: transparent; }"
         )
         self.setStyleSheet(ss)
         if getattr(self, "_shadow_frame", None) is not None:

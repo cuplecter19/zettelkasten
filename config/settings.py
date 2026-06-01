@@ -18,6 +18,6 @@ CLUSTER_MIN_NOTES    = 50
 SYNC_SERVER_URL  = os.environ.get("ZK_SYNC_SERVER_URL", "http://132.226.71.123:8000")
 DEVICE_ID        = os.environ.get("ZK_DEVICE_ID", "main-pc")  # 기기별 고유 값
 SYNC_TOKEN       = os.environ.get("ZK_SYNC_TOKEN", "")        # 최초 인증 후 저장
-SYNC_INTERVAL    = int(os.environ.get("ZK_SYNC_INTERVAL", "999999"))  # 초
+SYNC_INTERVAL    = int(os.environ.get("ZK_SYNC_INTERVAL", "300"))  # 초
 LAST_SYNC_AT     = None  # datetime. 앱 실행 시 로드/갱신한다.
 
