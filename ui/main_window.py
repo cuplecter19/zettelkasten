@@ -6,12 +6,12 @@ import logging
 from datetime import datetime
 
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QKeySequence
-from PySide6.QtWidgets import (QDockWidget, QFileDialog, QLabel, QLineEdit,
-                               QListWidget, QListWidgetItem, QMainWindow,
-                               QMenuBar, QMessageBox, QPushButton, QSplitter,
-                               QSizePolicy, QStyle, QSystemTrayIcon, QToolBar,
-                               QVBoxLayout, QWidget)
+from PySide6.QtGui import QAction, QColor, QKeySequence, QPainter
+from PySide6.QtWidgets import (QDockWidget, QFileDialog, QGraphicsDropShadowEffect,
+                               QLabel, QLineEdit, QListWidget, QListWidgetItem,
+                               QMainWindow, QMenuBar, QMessageBox, QPushButton,
+                               QSplitter, QSizePolicy, QStyle, QSystemTrayIcon,
+                               QToolBar, QVBoxLayout, QWidget)
 
 from db.repositories.note_repo import NoteRepository
 from config import settings
@@ -34,6 +34,36 @@ from ui.widgets.title_bar import CustomTitleBar, FramelessResizer
 
 logger = logging.getLogger(__name__)
 
+_SHADOW_MARGIN = 20   # 외부 그림자용 창 확장 여백 (px)
+_INNER_PADDING = 5    # 내부 콘텐츠 여백 (px)
+
+
+class _ShadowFrame(QWidget):
+    """메인 윈도우 외부 그림자 렌더링을 위한 배경 프레임.
+
+    QGraphicsDropShadowEffect 를 품으며, 창 콘텐츠 영역을 둥근 사각형으로
+    칠해 그림자의 외형이 둥글게 나타나도록 한다.  Z-순서는 최하단으로 유지해
+    다른 UI 요소가 이 위에 겹쳐 그려진다.
+    """
+
+    _RADIUS = 24
+
+    def __init__(self, parent: QWidget) -> None:
+        super().__init__(parent)
+        self._bg_color = QColor("#ffffff")
+
+    def set_bg_color(self, color: str) -> None:
+        self._bg_color = QColor(color)
+        self.update()
+
+    def paintEvent(self, event) -> None:  # noqa: N802
+        from PySide6.QtCore import QRectF
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setPen(Qt.NoPen)
+        painter.setBrush(self._bg_color)
+        painter.drawRoundedRect(QRectF(self.rect()), self._RADIUS, self._RADIUS)
+
 
 class MainWindow(QMainWindow):
     """제텔카스텐 메인 윈도우."""
@@ -49,10 +79,13 @@ class MainWindow(QMainWindow):
         self._layout = LayoutService()
 
         self.setWindowTitle("Zettelkasten")
-        self.resize(1100, 720)
+        # 그림자 여백(20px)을 양쪽에 포함해 창을 확장한다.
+        self.resize(1100 + 2 * _SHADOW_MARGIN, 720 + 2 * _SHADOW_MARGIN)
 
         # 기본 제목 표시줄 제거(커스텀 타이틀바 사용).
         self.setWindowFlag(Qt.FramelessWindowHint, True)
+        # 그림자가 투명 여백에 보이려면 WA_TranslucentBackground 가 필요하다.
+        self.setAttribute(Qt.WA_TranslucentBackground)
         self._apply_theme()
         self._theme.theme_changed.connect(self._apply_theme)
 
@@ -66,6 +99,11 @@ class MainWindow(QMainWindow):
         self._setup_sync()
         self._build_startup_dashboard()
 
+        # 그림자 프레임 생성 및 여백 적용 (모든 UI 빌드 완료 후).
+        self._setup_shadow_frame()
+        _m = _SHADOW_MARGIN + _INNER_PADDING
+        self.setContentsMargins(_m, _m, _m, _m)
+
         # 프레임리스 창 가장자리 리사이즈 핸들.
         self._resizer = FramelessResizer(self)
         self._resizer.reposition()
@@ -75,7 +113,16 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self) -> None:
         """현재 테마를 창에 적용한다."""
-        self.setStyleSheet(self._theme.build_stylesheet())
+        ss = self._theme.build_stylesheet()
+        # WA_TranslucentBackground 환경에서 그림자 여백 영역이 투명하게 보이도록
+        # QMainWindow 와 헤더 위젯의 배경을 투명으로 재정의한다.
+        ss += (
+            "\nQMainWindow { background-color: transparent; }"
+            "\n#WindowHeader { background-color: transparent; }"
+        )
+        self.setStyleSheet(ss)
+        if getattr(self, "_shadow_frame", None) is not None:
+            self._shadow_frame.set_bg_color(self._theme.get_color("background"))
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         super().resizeEvent(event)
@@ -84,6 +131,17 @@ class MainWindow(QMainWindow):
             self._resizer.reposition()
         if getattr(self, "_startup_dashboard", None) is not None:
             self._startup_dashboard.setGeometry(self.rect())
+        self._update_shadow_frame()
+
+    def changeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        """최대화/복원 시 그림자 여백과 마스크를 조정한다."""
+        super().changeEvent(event)
+        from PySide6.QtCore import QEvent
+        if event.type() == QEvent.WindowStateChange:
+            is_max = self.isMaximized()
+            _m = 0 if is_max else _SHADOW_MARGIN + _INNER_PADDING
+            self.setContentsMargins(_m, _m, _m, _m)
+            self._update_shadow_frame()
 
     def _apply_rounded_mask(self) -> None:
         """프레임리스 창의 네 모서리를 둥글게 잘라낸다."""
@@ -98,6 +156,32 @@ class MainWindow(QMainWindow):
         path.addRoundedRect(QRectF(self.rect()), radius, radius)
         region = QRegion(path.toFillPolygon().toPolygon())
         self.setMask(region)
+
+    def _setup_shadow_frame(self) -> None:
+        """그림자 효과 프레임을 생성하고 Z-순서를 최하단으로 설정한다."""
+        self._shadow_frame = _ShadowFrame(self)
+        self._shadow_frame.set_bg_color(self._theme.get_color("background"))
+
+        effect = QGraphicsDropShadowEffect(self._shadow_frame)
+        effect.setBlurRadius(20)
+        effect.setOffset(0.0, 2.0)
+        effect.setColor(QColor(0, 0, 0, 70))
+        self._shadow_frame.setGraphicsEffect(effect)
+
+        self._shadow_frame.lower()
+        self._update_shadow_frame()
+
+    def _update_shadow_frame(self) -> None:
+        """창 크기에 맞춰 그림자 프레임의 위치와 크기를 갱신한다."""
+        if getattr(self, "_shadow_frame", None) is None:
+            return
+        if self.isMaximized():
+            self._shadow_frame.hide()
+            return
+        sm = _SHADOW_MARGIN
+        self._shadow_frame.setGeometry(
+            sm, sm, self.width() - 2 * sm, self.height() - 2 * sm)
+        self._shadow_frame.show()
 
     # ----- UI 구성 --------------------------------------------------------
     def _build_toolbar(self) -> None:
