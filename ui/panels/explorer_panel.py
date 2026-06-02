@@ -55,6 +55,7 @@ class ExplorerPanel(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("ExplorerPanel")
         self._repo = NoteRepository()
         self._search = SearchService()
         self._attachments = AttachmentRepository()

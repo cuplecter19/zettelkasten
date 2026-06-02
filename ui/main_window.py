@@ -121,23 +121,28 @@ class MainWindow(QMainWindow):
         ss = self._theme.build_stylesheet()
         # WA_TranslucentBackground 환경에서 그림자 여백 영역이 투명하게 보이도록
         # QMainWindow 와 헤더 위젯의 배경을 투명으로 재정의한다.
+        sidebar_bg = self._theme.get_color("sidebar")
+        panel_bg = self._theme.get_color("background")
         ss += (
             "\nQMainWindow { background-color: transparent; }"
             "\n#WindowHeader { background-color: transparent; }"
             "\nQStatusBar { background-color: transparent; }"
             "\nQSplitter { background-color: transparent; }"
+            f"\nQWidget#ExplorerPanel {{ background-color: {sidebar_bg}; }}"
+            f"\nQWidget#EditorPanel {{ background-color: {panel_bg}; }}"
         )
         self.setStyleSheet(ss)
         if getattr(self, "_shadow_frame", None) is not None:
             self._shadow_frame.set_bg_color(self._theme.get_color("background"))
 
-    def resizeEvent(self, event) -> None:
+    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         super().resizeEvent(event)
-        # 그림자 프레임이 메인 윈도우 크기를 따라가도록
-        if hasattr(self, '_shadow_frame'):
-            self._shadow_frame.setGeometry(self.rect())
-        # 자기 자신의 라운딩 마스크 갱신
         self._apply_rounded_mask()
+        if getattr(self, "_resizer", None) is not None:
+            self._resizer.reposition()
+        if getattr(self, "_startup_dashboard", None) is not None:
+            self._startup_dashboard.setGeometry(self.rect())
+        self._update_shadow_frame()
 
     def changeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         """최대화/복원 시 그림자 여백과 마스크를 조정한다."""
@@ -150,7 +155,11 @@ class MainWindow(QMainWindow):
             self._update_shadow_frame()
 
     def _apply_rounded_mask(self) -> None:
-        self.clearMask()
+        if self.isMaximized() or not hasattr(self, "_shadow_frame"):
+            self.clearMask()
+            return
+        from PySide6.QtGui import QRegion
+        self.setMask(QRegion(self._shadow_frame.geometry()))
 
     def _setup_shadow_frame(self) -> None:
         """그림자 효과 프레임을 생성하고 Z-순서를 최하단으로 설정한다."""

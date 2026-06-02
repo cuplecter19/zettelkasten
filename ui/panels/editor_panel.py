@@ -126,6 +126,7 @@ class EditorPanel(QWidget):
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
+        self.setObjectName("EditorPanel")
         self._repo = NoteRepository()
         self._tag_repo = TagRepository()
         self._classifier = NoteClassifier()
