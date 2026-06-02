@@ -56,7 +56,7 @@ class _ShadowFrame(QWidget):
         self._bg_color = QColor(color)
         self.update()
 
-    def resizeEvent(self, event) -> None:  # noqa: N802
+    def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
 
     def paintEvent(self, event) -> None:  # noqa: N802
@@ -131,14 +131,13 @@ class MainWindow(QMainWindow):
         if getattr(self, "_shadow_frame", None) is not None:
             self._shadow_frame.set_bg_color(self._theme.get_color("background"))
 
-    def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+    def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        # 그림자 프레임이 메인 윈도우 크기를 따라가도록
+        if hasattr(self, '_shadow_frame'):
+            self._shadow_frame.setGeometry(self.rect())
+        # 자기 자신의 라운딩 마스크 갱신
         self._apply_rounded_mask()
-        if getattr(self, "_resizer", None) is not None:
-            self._resizer.reposition()
-        if getattr(self, "_startup_dashboard", None) is not None:
-            self._startup_dashboard.setGeometry(self.rect())
-        self._update_shadow_frame()
 
     def changeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         """최대화/복원 시 그림자 여백과 마스크를 조정한다."""
