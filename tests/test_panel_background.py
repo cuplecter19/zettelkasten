@@ -36,5 +36,9 @@ def test_suggestions_list_uses_editor_background(qtbot, db, monkeypatch):
     assert panel.objectName() == "SuggestionsPanel"
     assert panel.testAttribute(Qt.WA_StyledBackground)
     assert window._suggestions.objectName() == "SuggestedNotesList"
+    assert window._suggestions.testAttribute(Qt.WA_StyledBackground)
     assert "QListWidget#SuggestedNotesList" in window.styleSheet()
-    assert "border-radius: 12px" in window.styleSheet()
+    assert f"background-color: {window._theme.get_color('editor')}" in panel.styleSheet()
+    assert "border-radius: 12px" in panel.styleSheet()
+    assert f"background-color: {window._theme.get_color('editor')}" in window._suggestions.styleSheet()
+    assert "border-radius: 12px" in window._suggestions.styleSheet()

@@ -138,8 +138,31 @@ class MainWindow(QMainWindow):
             f"\nQListWidget#SuggestedNotesList::viewport {{ background-color: {editor_bg}; border-radius: 12px; }}"
         )
         self.setStyleSheet(ss)
+        self._apply_suggestions_style()
         if getattr(self, "_shadow_frame", None) is not None:
             self._shadow_frame.set_bg_color(self._theme.get_color("background"))
+
+    def _apply_suggestions_style(self) -> None:
+        """연결 노트 제안 패널/리스트 배경을 에디터 입력 영역과 맞춘다."""
+        suggestions = getattr(self, "_suggestions", None)
+        if suggestions is None:
+            return
+        editor_bg = self._theme.get_color("editor")
+        text = self._theme.get_color("text")
+        panel = suggestions.parentWidget()
+        if panel is not None:
+            panel.setStyleSheet(
+                f"QWidget#SuggestionsPanel {{ background-color: {editor_bg};"
+                " border-radius: 12px; }"
+            )
+        suggestions.setAttribute(Qt.WA_StyledBackground, True)
+        suggestions.setStyleSheet(
+            "QListWidget#SuggestedNotesList {"
+            f" background-color: {editor_bg}; color: {text}; border: none;"
+            " border-radius: 12px; padding: 8px; }"
+            "QListWidget#SuggestedNotesList::viewport {"
+            f" background-color: {editor_bg}; border-radius: 12px; }}"
+        )
 
     def resizeEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         super().resizeEvent(event)
@@ -238,6 +261,7 @@ class MainWindow(QMainWindow):
         self._suggestions.setObjectName("SuggestedNotesList")
         self._suggestions.itemClicked.connect(self._on_suggestion_clicked)
         sug_layout.addWidget(self._suggestions)
+        self._apply_suggestions_style()
         right.addWidget(suggestions)
         right.setStretchFactor(0, 3)
         right.setStretchFactor(1, 1)
