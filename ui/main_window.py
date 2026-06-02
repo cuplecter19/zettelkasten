@@ -261,6 +261,7 @@ class MainWindow(QMainWindow):
         self._suggestions.setObjectName("SuggestedNotesList")
         self._suggestions.itemClicked.connect(self._on_suggestion_clicked)
         sug_layout.addWidget(self._suggestions)
+        self._apply_suggestions_style()
         right.addWidget(suggestions)
         right.setStretchFactor(0, 3)
         right.setStretchFactor(1, 1)
