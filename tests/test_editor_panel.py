@@ -114,10 +114,13 @@ def test_category_dropdown_uses_angle_not_svg(qtbot, db, tmp_path):
     panel._apply_category_style("IDEA")
 
     assert isinstance(panel._category, CategoryComboBox)
-    assert CategoryComboBox._ANGLE == "⌄"
+    assert CategoryComboBox._ANGLE == "\uf107"
+    assert CategoryComboBox._ANGLE_AREA_WIDTH == 16
     assert CategoryComboBox._ANGLE_GAP == 4
+    assert CategoryComboBox._EXTRA_WIDTH == 10
     assert "data:image/svg+xml" not in panel._category.styleSheet()
     assert "image: none" in panel._category.styleSheet()
+    assert "padding: 2px 0px" in panel._category.styleSheet()
 
 
 def test_category_dropdown_saves_type_and_custom_color(qtbot, db, tmp_path):

@@ -6,7 +6,7 @@ import logging
 from pathlib import Path
 
 from PySide6.QtCore import QEvent, QSignalBlocker, Qt, QThread, Signal
-from PySide6.QtGui import QColor, QPixmap
+from PySide6.QtGui import QColor, QPainter, QPen, QPixmap
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QHBoxLayout,
                                QLabel, QLineEdit, QMessageBox, QPushButton,
                                QStyle, QStyleOptionComboBox, QStylePainter,
@@ -34,10 +34,17 @@ _NOTE_TYPES = tuple(NOTE_TYPE_COLORS)
 
 
 class CategoryComboBox(QComboBox):
-    """현재 카테고리 텍스트와 흰색 하단 앵글을 가운데 정렬해 그린다."""
+    """현재 카테고리 텍스트와 우측 고정 앵글을 그린다."""
 
-    _ANGLE = "⌄"
+    _ANGLE = "\uf107"
+    _ANGLE_AREA_WIDTH = 16
     _ANGLE_GAP = 4
+    _EXTRA_WIDTH = 10
+
+    def sizeHint(self):  # noqa: N802 (Qt naming)
+        size = super().sizeHint()
+        size.setWidth(size.width() + self._EXTRA_WIDTH)
+        return size
 
     def paintEvent(self, event) -> None:  # noqa: N802 (Qt naming)
         option = QStyleOptionComboBox()
@@ -50,16 +57,25 @@ class CategoryComboBox(QComboBox):
         painter.setPen(QColor("#ffffff"))
         metrics = painter.fontMetrics()
         text = self.currentText()
-        text_width = metrics.horizontalAdvance(text)
-        angle_width = metrics.horizontalAdvance(self._ANGLE)
-        total_width = text_width + self._ANGLE_GAP + angle_width
-        rect = self.rect().adjusted(10, 0, -10, 0)
-        left = rect.left() + max(0, (rect.width() - total_width) // 2)
-        baseline = rect.top() + (rect.height() + metrics.ascent()
-                                 - metrics.descent()) // 2
-        painter.drawText(left, baseline, text)
-        painter.drawText(left + text_width + self._ANGLE_GAP, baseline,
-                         self._ANGLE)
+        angle_rect = self.rect().adjusted(
+            self.width() - self._ANGLE_AREA_WIDTH - 10, 0, -10, 0)
+        text_rect = self.rect().adjusted(
+            10, 0, -(self._ANGLE_AREA_WIDTH + self._ANGLE_GAP + 10), 0)
+        elided_text = metrics.elidedText(text, Qt.ElideRight, text_rect.width())
+        painter.drawText(text_rect, Qt.AlignCenter, elided_text)
+
+        painter.setRenderHint(QPainter.Antialiasing, True)
+        pen = QPen(QColor("#ffffff"), 1.6)
+        pen.setCapStyle(Qt.RoundCap)
+        pen.setJoinStyle(Qt.RoundJoin)
+        painter.setPen(pen)
+        center = angle_rect.center()
+        half_width = 4
+        half_height = 2
+        painter.drawLine(center.x() - half_width, center.y() - half_height,
+                         center.x(), center.y() + half_height)
+        painter.drawLine(center.x(), center.y() + half_height,
+                         center.x() + half_width, center.y() - half_height)
 
 
 class _ThumbnailWorker(QThread):
@@ -529,6 +545,8 @@ class EditorPanel(QWidget):
             "QComboBox#CategoryDropdown::down-arrow { image: none; }"
             "QComboBox#CategoryDropdown QAbstractItemView {"
             " border: none; outline: none; }"
+            "QComboBox#CategoryDropdown QAbstractItemView::item {"
+            " padding: 2px 0px; }"
         )
 
     def _on_category_changed(self, note_type: str) -> None:
