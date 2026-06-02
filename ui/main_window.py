@@ -34,8 +34,9 @@ from ui.widgets.title_bar import CustomTitleBar, FramelessResizer
 
 logger = logging.getLogger(__name__)
 
-_SHADOW_MARGIN = 20   # 외부 그림자용 창 확장 여백 (px)
+_SHADOW_MARGIN = 28   # 외부 그림자용 창 확장 여백 (px)
 _INNER_PADDING = 5    # 내부 콘텐츠 여백 (px)
+_WINDOW_RADIUS = 24
 
 
 class _ShadowFrame(QWidget):
@@ -46,7 +47,7 @@ class _ShadowFrame(QWidget):
     다른 UI 요소가 이 위에 겹쳐 그려진다.
     """
 
-    _RADIUS = 24
+    _RADIUS = _WINDOW_RADIUS
 
     def __init__(self, parent: QWidget) -> None:
         super().__init__(parent)
@@ -121,15 +122,16 @@ class MainWindow(QMainWindow):
         ss = self._theme.build_stylesheet()
         # WA_TranslucentBackground 환경에서 그림자 여백 영역이 투명하게 보이도록
         # QMainWindow 와 헤더 위젯의 배경을 투명으로 재정의한다.
-        sidebar_bg = self._theme.get_color("sidebar")
-        panel_bg = self._theme.get_color("background")
+        editor_bg = self._theme.get_color("editor")
         ss += (
             "\nQMainWindow { background-color: transparent; }"
             "\n#WindowHeader { background-color: transparent; }"
-            "\nQStatusBar { background-color: transparent; }"
+            "\nQStatusBar { background-color: transparent; margin-left: 24px; margin-right: 24px; }"
+            "\nQStatusBar QLabel { background-color: transparent; }"
             "\nQSplitter { background-color: transparent; }"
-            f"\nQWidget#ExplorerPanel {{ background-color: {sidebar_bg}; }}"
-            f"\nQWidget#EditorPanel {{ background-color: {panel_bg}; }}"
+            f"\nQWidget#ExplorerPanel {{ background-color: {editor_bg}; border-radius: 12px; }}"
+            f"\nQWidget#EditorPanel {{ background-color: {editor_bg}; border-radius: 12px; }}"
+            f"\nQWidget#SuggestionsPanel {{ background-color: {editor_bg}; border-radius: 12px; }}"
         )
         self.setStyleSheet(ss)
         if getattr(self, "_shadow_frame", None) is not None:
@@ -159,7 +161,7 @@ class MainWindow(QMainWindow):
             self.clearMask()
             return
         from PySide6.QtGui import QRegion
-        self.setMask(QRegion(self._shadow_frame.geometry()))
+        self.setMask(QRegion(self.rect()))
 
     def _setup_shadow_frame(self) -> None:
         """그림자 효과 프레임을 생성하고 Z-순서를 최하단으로 설정한다."""
@@ -167,9 +169,9 @@ class MainWindow(QMainWindow):
         self._shadow_frame.set_bg_color(self._theme.get_color("background"))
 
         effect = QGraphicsDropShadowEffect(self._shadow_frame)
-        effect.setBlurRadius(20)
-        effect.setOffset(0.0, 2.0)
-        effect.setColor(QColor(0, 0, 0, 70))
+        effect.setBlurRadius(28)
+        effect.setOffset(0.0, 4.0)
+        effect.setColor(QColor(0, 0, 0, 80))
         self._shadow_frame.setGraphicsEffect(effect)
 
         self._shadow_frame.lower()
@@ -223,6 +225,7 @@ class MainWindow(QMainWindow):
 
         # 연결 노트 제안 영역.
         suggestions = QWidget(self)
+        suggestions.setObjectName("SuggestionsPanel")
         sug_layout = QVBoxLayout(suggestions)
         sug_layout.setContentsMargins(4, 4, 4, 4)
         sug_layout.addWidget(QLabel("연결 노트 제안"))
@@ -337,15 +340,19 @@ class MainWindow(QMainWindow):
         self._view_menu.addAction(graph_dock.toggleViewAction())
 
     def _build_statusbar(self) -> None:
-        self.statusBar().setContentsMargins(12, 0, 12, 0)
+        self.statusBar().setContentsMargins(_WINDOW_RADIUS, 0, _WINDOW_RADIUS, 0)
+        self.statusBar().layout().setContentsMargins(
+            _WINDOW_RADIUS, 0, _WINDOW_RADIUS, 0)
         self._status_label = QLabel("", self)
-        self._status_label.setContentsMargins(12, 0, 0, 0)
+        self._status_label.setContentsMargins(0, 0, 0, 0)
+        self._status_label.setStyleSheet("background-color: transparent;")
         self.statusBar().addWidget(self._status_label)
 
         # 동기화 상태 표시(이모지 미사용): 색상 점 + 텍스트.
         self._sync_dot = QLabel(self)
         self._sync_dot.setFixedSize(12, 12)
         self._sync_text = QLabel("오프라인", self)
+        self._sync_text.setStyleSheet("background-color: transparent;")
         self.statusBar().addPermanentWidget(self._sync_dot)
         self.statusBar().addPermanentWidget(self._sync_text)
         self._update_sync_indicator("offline")
