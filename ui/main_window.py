@@ -83,7 +83,7 @@ class MainWindow(QMainWindow):
         self._layout = LayoutService()
 
         self.setWindowTitle("Zettelkasten")
-        # 그림자 여백(20px)을 양쪽에 포함해 창을 확장한다.
+        # 그림자 여백을 양쪽에 포함해 창을 확장한다.
         self.resize(1100 + 2 * _SHADOW_MARGIN, 720 + 2 * _SHADOW_MARGIN)
 
         # 기본 제목 표시줄 제거(커스텀 타이틀바 사용).
