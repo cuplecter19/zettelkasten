@@ -39,7 +39,7 @@ class CategoryComboBox(QComboBox):
     _ANGLE = "\uf107"
     _ANGLE_AREA_WIDTH = 16
     _ANGLE_GAP = 4
-    _EXTRA_WIDTH = 10
+    _EXTRA_WIDTH = 30
 
     def sizeHint(self):  # noqa: N802 (Qt naming)
         size = super().sizeHint()
