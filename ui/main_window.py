@@ -123,6 +123,7 @@ class MainWindow(QMainWindow):
         # WA_TranslucentBackground 환경에서 그림자 여백 영역이 투명하게 보이도록
         # QMainWindow 와 헤더 위젯의 배경을 투명으로 재정의한다.
         editor_bg = self._theme.get_color("editor")
+        text = self._theme.get_color("text")
         ss += (
             "\nQMainWindow { background-color: transparent; }"
             "\n#WindowHeader { background-color: transparent; }"
@@ -132,6 +133,9 @@ class MainWindow(QMainWindow):
             f"\nQWidget#ExplorerPanel {{ background-color: {editor_bg}; border-radius: 12px; }}"
             f"\nQWidget#EditorPanel {{ background-color: {editor_bg}; border-radius: 12px; }}"
             f"\nQWidget#SuggestionsPanel {{ background-color: {editor_bg}; border-radius: 12px; }}"
+            f"\nQListWidget#SuggestedNotesList {{ background-color: {editor_bg}; color: {text}; "
+            "border: none; border-radius: 12px; padding: 8px; }"
+            f"\nQListWidget#SuggestedNotesList::viewport {{ background-color: {editor_bg}; border-radius: 12px; }}"
         )
         self.setStyleSheet(ss)
         if getattr(self, "_shadow_frame", None) is not None:
@@ -226,10 +230,12 @@ class MainWindow(QMainWindow):
         # 연결 노트 제안 영역.
         suggestions = QWidget(self)
         suggestions.setObjectName("SuggestionsPanel")
+        suggestions.setAttribute(Qt.WA_StyledBackground, True)
         sug_layout = QVBoxLayout(suggestions)
         sug_layout.setContentsMargins(4, 4, 4, 4)
         sug_layout.addWidget(QLabel("연결 노트 제안"))
         self._suggestions = QListWidget(suggestions)
+        self._suggestions.setObjectName("SuggestedNotesList")
         self._suggestions.itemClicked.connect(self._on_suggestion_clicked)
         sug_layout.addWidget(self._suggestions)
         right.addWidget(suggestions)
