@@ -10,7 +10,7 @@ from services.attachment_service import AttachmentService
 from services.css_snippet_service import CssSnippetService
 from services.markdown_style_service import MarkdownStyleService
 from services.theme_service import ThemeService
-from ui.panels.editor_panel import EditorPanel, ImageAttachmentCard
+from ui.panels.editor_panel import CategoryComboBox, EditorPanel, ImageAttachmentCard
 
 
 def _make_image(path) -> str:
@@ -89,6 +89,35 @@ def test_category_dropdown_loads_note_type(qtbot, db):
     panel.load_note(note)
 
     assert panel._category.currentText() == "MOOD"
+
+
+def test_note_fields_match_search_background_style(qtbot, db, tmp_path):
+    panel = EditorPanel()
+    panel._theme = ThemeService(tmp_path / "theme.json")
+    panel._theme.set_color("editor", "#112233")
+    panel._theme.set_color("text", "#445566")
+    qtbot.addWidget(panel)
+
+    panel._refresh_editor_field_styles()
+
+    assert "background-color: #112233" in panel._title.styleSheet()
+    assert "border-radius: 12px" in panel._title.styleSheet()
+    assert "background-color: #112233" in panel._body.styleSheet()
+    assert "border-radius: 12px" in panel._body.styleSheet()
+
+
+def test_category_dropdown_uses_angle_not_svg(qtbot, db, tmp_path):
+    panel = EditorPanel()
+    panel._theme = ThemeService(tmp_path / "theme.json")
+    qtbot.addWidget(panel)
+
+    panel._apply_category_style("IDEA")
+
+    assert isinstance(panel._category, CategoryComboBox)
+    assert CategoryComboBox._ANGLE == "⌄"
+    assert CategoryComboBox._ANGLE_GAP == 4
+    assert "data:image/svg+xml" not in panel._category.styleSheet()
+    assert "image: none" in panel._category.styleSheet()
 
 
 def test_category_dropdown_saves_type_and_custom_color(qtbot, db, tmp_path):

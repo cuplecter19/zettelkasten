@@ -9,6 +9,7 @@ from PySide6.QtCore import QEvent, QSignalBlocker, Qt, QThread, Signal
 from PySide6.QtGui import QColor, QPixmap
 from PySide6.QtWidgets import (QComboBox, QFileDialog, QFrame, QHBoxLayout,
                                QLabel, QLineEdit, QMessageBox, QPushButton,
+                               QStyle, QStyleOptionComboBox, QStylePainter,
                                QTextBrowser, QTextEdit, QToolButton,
                                QVBoxLayout, QWidget)
 
@@ -30,6 +31,35 @@ logger = logging.getLogger(__name__)
 _IMAGE_PDF_FILTER = (
     "첨부 파일 (*.png *.jpg *.jpeg *.gif *.bmp *.webp *.pdf);;모든 파일 (*)")
 _NOTE_TYPES = tuple(NOTE_TYPE_COLORS)
+
+
+class CategoryComboBox(QComboBox):
+    """현재 카테고리 텍스트와 흰색 하단 앵글을 가운데 정렬해 그린다."""
+
+    _ANGLE = "⌄"
+    _ANGLE_GAP = 4
+
+    def paintEvent(self, event) -> None:  # noqa: N802 (Qt naming)
+        option = QStyleOptionComboBox()
+        self.initStyleOption(option)
+        option.currentText = ""
+
+        painter = QStylePainter(self)
+        painter.drawComplexControl(QStyle.CC_ComboBox, option)
+
+        painter.setPen(QColor("#ffffff"))
+        metrics = painter.fontMetrics()
+        text = self.currentText()
+        text_width = metrics.horizontalAdvance(text)
+        angle_width = metrics.horizontalAdvance(self._ANGLE)
+        total_width = text_width + self._ANGLE_GAP + angle_width
+        rect = self.rect().adjusted(10, 0, -10, 0)
+        left = rect.left() + max(0, (rect.width() - total_width) // 2)
+        baseline = rect.top() + (rect.height() + metrics.ascent()
+                                 - metrics.descent()) // 2
+        painter.drawText(left, baseline, text)
+        painter.drawText(left + text_width + self._ANGLE_GAP, baseline,
+                         self._ANGLE)
 
 
 class _ThumbnailWorker(QThread):
@@ -154,13 +184,13 @@ class EditorPanel(QWidget):
         layout.addLayout(toolbar)
 
         self._title = QLineEdit(self)
+        self._title.setObjectName("NoteTitleInput")
         self._title.setPlaceholderText("제목")
-        self._title.setStyleSheet("font-size: 18px; font-weight: bold;")
 
         title_row = QHBoxLayout()
         title_row.setSpacing(8)
         title_row.addWidget(self._title, 1)
-        self._category = QComboBox(self)
+        self._category = CategoryComboBox(self)
         self._category.setObjectName("CategoryDropdown")
         self._category.setCursor(Qt.PointingHandCursor)
         self._category.addItems(_NOTE_TYPES)
@@ -185,8 +215,10 @@ class EditorPanel(QWidget):
         layout.addWidget(self._banner)
 
         self._body = QTextEdit(self)
+        self._body.setObjectName("NoteBodyInput")
         self._body.setPlaceholderText("본문을 입력하세요. 포커스를 벗어나면 자동 저장됩니다.")
         layout.addWidget(self._body, 1)
+        self._refresh_editor_field_styles()
 
         # 마크다운 렌더링 미리보기(토글 시 표시).
         self._preview = QTextBrowser(self)
@@ -199,6 +231,7 @@ class EditorPanel(QWidget):
         self._css_snippets.snippets_changed.connect(self._refresh_preview)
         self._fonts.fonts_changed.connect(self._refresh_preview)
         self._theme.theme_changed.connect(self._refresh_category_colors)
+        self._theme.theme_changed.connect(self._refresh_editor_field_styles)
 
         # PDF 등 첨부 카드 영역.
         self._attach_container = QWidget(self)
@@ -218,6 +251,21 @@ class EditorPanel(QWidget):
         self._title.installEventFilter(self)
         self._body.installEventFilter(self)
         self.setEnabled(False)
+
+    def _refresh_editor_field_styles(self) -> None:
+        editor = self._theme.get_color("editor")
+        text = self._theme.get_color("text")
+        self._title.setStyleSheet(
+            "QLineEdit#NoteTitleInput {"
+            f" background-color: {editor}; color: {text}; border: none;"
+            " border-radius: 12px; padding: 8px;"
+            " font-size: 18px; font-weight: bold; }"
+        )
+        self._body.setStyleSheet(
+            "QTextEdit#NoteBodyInput {"
+            f" background-color: {editor}; color: {text}; border: none;"
+            " border-radius: 12px; padding: 8px; }"
+        )
 
     # ----- 노트 로딩/저장 -------------------------------------------------
     def load_note(self, note: Note | None) -> None:
@@ -471,24 +519,14 @@ class EditorPanel(QWidget):
 
     def _apply_category_style(self, note_type: str) -> None:
         color = self._category_color(note_type)
-        # 흰색 삼각형 화살표 — 외부 파일 없이 SVG data URI 인라인 사용.
-        # 좌측 패딩(22px)을 드롭다운 영역 너비(20px)와 맞춰 텍스트 중앙 정렬 유지.
-        arrow = (
-            "data:image/svg+xml,"
-            "%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 10 6'%3E"
-            "%3Cpolygon points='0,0 10,0 5,6' fill='white'/%3E"
-            "%3C/svg%3E"
-        )
         self._category.setStyleSheet(
             "QComboBox#CategoryDropdown {"
             f" background-color: {color}; color: #ffffff; border: none;"
-            " border-radius: 10px; padding: 6px 8px 6px 22px;"
+            " border-radius: 10px; padding: 6px 12px;"
             " font-weight: bold; text-align: center; }"
             "QComboBox#CategoryDropdown::drop-down {"
-            " border: none; width: 20px;"
-            " subcontrol-origin: padding; subcontrol-position: right center; }"
-            f"QComboBox#CategoryDropdown::down-arrow {{ image: url(\"{arrow}\");"
-            " width: 10px; height: 6px; }"
+            " border: none; width: 0px; }"
+            "QComboBox#CategoryDropdown::down-arrow { image: none; }"
             "QComboBox#CategoryDropdown QAbstractItemView {"
             " border: none; outline: none; }"
         )
