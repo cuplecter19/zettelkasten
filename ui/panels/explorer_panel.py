@@ -120,7 +120,7 @@ class ExplorerPanel(QWidget):
             f" background-color: {editor}; color: {text}; border: none;"
             " border-radius: 12px; padding: 8px; }"
             "QListWidget#NoteList::viewport {"
-            f" background-color: {editor}; border-radius: 12px; }"
+            f" background-color: {editor}; border-radius: 12px; }}"
             "QListWidget#NoteList::item { border-radius: 8px; }"
             "QListWidget#NoteList::item:selected {"
             " background-color: transparent; }"
