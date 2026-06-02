@@ -58,11 +58,6 @@ class _ShadowFrame(QWidget):
 
     def resizeEvent(self, event) -> None:  # noqa: N802
         super().resizeEvent(event)
-        from PySide6.QtCore import QRectF
-        from PySide6.QtGui import QPainterPath, QRegion
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(self.rect()), self._RADIUS, self._RADIUS)
-        self.setMask(QRegion(path.toFillPolygon().toPolygon()))
 
     def paintEvent(self, event) -> None:  # noqa: N802
         from PySide6.QtCore import QRectF
@@ -99,6 +94,8 @@ class MainWindow(QMainWindow):
 
         self._build_toolbar()
         self._build_central()
+        self.centralWidget().setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.centralWidget().setStyleSheet("background: transparent;")
         self._build_menu()
         self._build_titlebar()
         self._build_docks()
@@ -154,18 +151,7 @@ class MainWindow(QMainWindow):
             self._update_shadow_frame()
 
     def _apply_rounded_mask(self) -> None:
-        """프레임리스 창의 네 모서리를 둥글게 잘라낸다."""
-        from PySide6.QtCore import QRectF
-        from PySide6.QtGui import QPainterPath, QRegion
-
-        if self.isMaximized():
-            self.clearMask()
-            return
-        radius = 24
-        path = QPainterPath()
-        path.addRoundedRect(QRectF(self.rect()), radius, radius)
-        region = QRegion(path.toFillPolygon().toPolygon())
-        self.setMask(region)
+        self.clearMask()
 
     def _setup_shadow_frame(self) -> None:
         """그림자 효과 프레임을 생성하고 Z-순서를 최하단으로 설정한다."""
