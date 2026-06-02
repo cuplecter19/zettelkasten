@@ -13,6 +13,7 @@ from config.categories import NOTE_TYPE_COLORS
 from db.repositories.attachment_repo import AttachmentRepository
 from db.repositories.note_repo import NoteRepository
 from services.search_service import SearchService
+from services.theme_service import get_theme_service
 from ui.widgets.note_card import NoteCard
 
 logger = logging.getLogger(__name__)
@@ -59,6 +60,7 @@ class ExplorerPanel(QWidget):
         self._repo = NoteRepository()
         self._search = SearchService()
         self._attachments = AttachmentRepository()
+        self._theme = get_theme_service()
         self._query = ""
         self._active_type: str | None = None
         self._suppress_reorder = False
@@ -83,12 +85,15 @@ class ExplorerPanel(QWidget):
         layout.addLayout(filter_bar)
 
         self._list = SmoothScrollListWidget(self)
+        self._list.setObjectName("NoteList")
         self._list.itemClicked.connect(self._on_item_clicked)
         self._list.setSpacing(8)
         # 드래그 앤 드롭으로 순서 변경 활성화(내부 이동).
         self._list.setDragDropMode(QAbstractItemView.InternalMove)
         self._list.model().rowsMoved.connect(self._on_rows_moved)
         layout.addWidget(self._list, 1)
+        self._apply_list_style()
+        self._theme.theme_changed.connect(self._apply_list_style)
 
         self.refresh()
 
@@ -106,6 +111,20 @@ class ExplorerPanel(QWidget):
     def set_query(self, query: str) -> None:
         self._query = query or ""
         self.refresh()
+
+    def _apply_list_style(self) -> None:
+        editor = self._theme.get_color("editor")
+        text = self._theme.get_color("text")
+        self._list.setStyleSheet(
+            "QListWidget#NoteList {"
+            f" background-color: {editor}; color: {text}; border: none;"
+            " border-radius: 12px; padding: 8px; }"
+            "QListWidget#NoteList::viewport {"
+            f" background-color: {editor}; border-radius: 12px; }}"
+            "QListWidget#NoteList::item { border-radius: 8px; }"
+            "QListWidget#NoteList::item:selected {"
+            " background-color: transparent; }"
+        )
 
     def refresh(self) -> None:
         # refresh 중에는 rowsMoved 시그널을 무시한다.
